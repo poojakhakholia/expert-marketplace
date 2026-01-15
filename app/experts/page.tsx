@@ -1,26 +1,22 @@
-export default function Experts() {
+import { supabase } from "@/lib/supabase";
+
+export default async function Experts() {
+  const { data } = await supabase
+    .from("expert_profiles")
+    .select("*")
+    .eq("approval_status", "approved");
+
   return (
     <main style={{ padding: 40 }}>
-      <h1 style={{ fontSize: 28 }}>Experts</h1>
-      <p style={{ color: "#555" }}>Verified professionals you can book instantly</p>
+      <h1>Experts</h1>
 
-      <div style={{ marginTop: 30 }}>
-        {[1, 2, 3].map((id) => (
-          <div
-            key={id}
-            style={{
-              padding: 20,
-              border: "1px solid #eee",
-              borderRadius: 8,
-              marginBottom: 15,
-            }}
-          >
-            <h3>Expert Name</h3>
-            <p>Fitness Coach • ₹999 / 30 mins</p>
-            <a href="/experts/1">View Profile</a>
-          </div>
-        ))}
-      </div>
+      {data?.map((expert) => (
+        <div key={expert.user_id} style={{ marginBottom: 20 }}>
+          <h3>{expert.headline}</h3>
+          <p>{expert.bio}</p>
+          <a href={`/experts/${expert.user_id}`}>View Profile</a>
+        </div>
+      ))}
     </main>
   );
 }
