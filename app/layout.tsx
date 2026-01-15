@@ -1,3 +1,5 @@
+import Script from "next/script";
+
 export default function RootLayout({
   children,
 }: {
@@ -5,14 +7,14 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en">
-      <body style={{ margin: 0, fontFamily: "Arial, sans-serif" }}>
-        <header style={{ padding: 20, borderBottom: "1px solid #eee" }}>
-          <a href="/" style={{ marginRight: 20 }}>Home</a>
-          <a href="/experts" style={{ marginRight: 20 }}>Experts</a>
-          <a href="/login">Login</a>
-        </header>
-        <main>{children}</main>
-      </body>
+      <head>
+        <Script
+          src="https://checkout.razorpay.com/v1/checkout.js"
+          strategy="beforeInteractive"
+        />
+      </head>
+      <body>{children}</body>
     </html>
   );
 }
+
