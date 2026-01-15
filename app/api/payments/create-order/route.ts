@@ -4,6 +4,8 @@ import { NextResponse } from "next/server";
 export async function POST(req: Request) {
   try {
     const body = await req.json();
+    console.log("CREATE ORDER BODY:", body);
+
     const { amount } = body;
 
     if (!amount || amount <= 0) {
