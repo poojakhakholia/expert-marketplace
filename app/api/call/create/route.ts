@@ -21,7 +21,6 @@ export async function POST() {
       properties: {
         enable_chat: false,
         enable_screenshare: false,
-        enable_recording: "never",
         exp: Math.floor(Date.now() / 1000) + 60 * 60,
       },
     }),
