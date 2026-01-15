@@ -3,11 +3,19 @@
 import { supabase } from "../../lib/supabase";
 
 export default function Login() {
-  const loginWithGoogle = async () => {
-    await supabase.auth.signInWithOAuth({
-      provider: "google",
-    });
-  };
+  return (
+    <main style={{ padding: 40 }}>
+      <h1>Login</h1>
+      <button
+        onClick={() =>
+          supabase.auth.signInWithOAuth({ provider: "google" })
+        }
+      >
+        Continue with Google
+      </button>
+    </main>
+  );
+}
 
   return (
     <main style={{ padding: 40 }}>
