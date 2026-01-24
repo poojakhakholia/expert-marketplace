@@ -1,79 +1,156 @@
 "use client";
 
+import { useEffect, useState } from "react";
+import { useSearchParams, useRouter } from "next/navigation";
 import Script from "next/script";
+import { supabase } from "@/lib/supabase";
+
+declare global {
+  interface Window {
+    Razorpay: any;
+  }
+}
 
 export default function TestPaymentPage() {
+  const router = useRouter();
+  const searchParams = useSearchParams();
+  const bookingId = searchParams.get("booking_id");
+
+  const [amount, setAmount] = useState<number | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [razorpayReady, setRazorpayReady] = useState(false);
+  const [processing, setProcessing] = useState(false);
+
+  /* ---------------- Load booking amount ---------------- */
+  useEffect(() => {
+    if (!bookingId) return;
+
+    const loadBooking = async () => {
+      const { data, error } = await supabase
+        .from("bookings")
+        .select("amount")
+        .eq("id", bookingId)
+        .single();
+
+      if (error || !data) {
+        alert("Failed to load booking");
+        return;
+      }
+
+      setAmount(data.amount);
+      setLoading(false);
+    };
+
+    loadBooking();
+  }, [bookingId]);
+
+  /* ---------------- Pay Now ---------------- */
   const payNow = async () => {
-    // Safety check (temporary but useful)
-    const key = process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID;
-    if (!key) {
-      alert("Razorpay public key missing");
+    if (!amount || !razorpayReady || !bookingId) {
+      alert("Payment system not ready yet");
       return;
     }
 
-    // Create order on backend
+    setProcessing(true);
+
+    // 1. Create Razorpay order
     const res = await fetch("/api/payments/create-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount: 500 }), // ₹500
+      body: JSON.stringify({ amount }),
     });
 
     if (!res.ok) {
-      alert("Failed to create order");
+      alert("Failed to create payment order");
+      setProcessing(false);
       return;
     }
 
-    const data = await res.json();
+    const order = await res.json();
 
+    // 2. Razorpay checkout
     const options = {
-      key, // ✅ PUBLIC KEY
-      amount: data.amount, // already in paise
+      key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
+      amount: order.amount, // already in paise
       currency: "INR",
-      name: "Expert Marketplace",
-      description: "Test Expert Session",
-      order_id: data.order_id,
-      handler: function (response: any) {
-        console.log("PAYMENT SUCCESS:", response);
-        alert("Payment successful");
+      name: "Callwithpro",
+      description: "Expert Session",
+      order_id: order.order_id,
+
+      handler: async function (response: any) {
+        try {
+          // 3. Verify payment (NO booking confirmation here)
+          const verifyRes = await fetch("/api/payments/verify", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              booking_id: bookingId,
+              razorpay_payment_id: response.razorpay_payment_id,
+              razorpay_order_id: response.razorpay_order_id,
+            }),
+          });
+
+          if (!verifyRes.ok) {
+            alert("Payment succeeded but verification failed");
+            setProcessing(false);
+            return;
+          }
+
+          // 4. Redirect user to booking details
+          router.push("/account/orders");
+        } catch (err) {
+          console.error(err);
+          alert("Unexpected error after payment");
+          setProcessing(false);
+        }
       },
-      prefill: {
-        name: "Test User",
-        email: "test@example.com",
-      },
+
       theme: {
         color: "#4B6EFF",
       },
     };
 
-    // @ts-ignore
     const rzp = new window.Razorpay(options);
     rzp.open();
   };
 
+  /* ---------------- UI ---------------- */
+  if (loading) {
+    return <div className="p-10">Loading payment…</div>;
+  }
+
   return (
     <>
-      {/* Razorpay Checkout Script */}
+      {/* Razorpay script */}
       <Script
         src="https://checkout.razorpay.com/v1/checkout.js"
-        strategy="beforeInteractive"
+        strategy="afterInteractive"
+        onLoad={() => setRazorpayReady(true)}
       />
 
-      <main style={{ padding: 40 }}>
-        <h1>Test Razorpay Payment</h1>
+      <main className="p-10 max-w-xl">
+        <h1 className="text-xl font-semibold mb-4">
+          Test Razorpay Payment
+        </h1>
+
+        <p className="mb-6">
+          Amount to pay: <strong>₹{amount}</strong>
+        </p>
 
         <button
           onClick={payNow}
-          style={{
-            padding: "12px 24px",
-            backgroundColor: "#4B6EFF",
-            color: "#fff",
-            border: "none",
-            borderRadius: 6,
-            cursor: "pointer",
-            marginTop: 20,
-          }}
+          disabled={!razorpayReady || processing}
+          className={`px-6 py-3 rounded-lg text-white ${
+            razorpayReady && !processing
+              ? "bg-blue-600"
+              : "bg-gray-400"
+          }`}
         >
-          Pay ₹500
+          {processing
+            ? "Processing payment…"
+            : razorpayReady
+            ? `Pay ₹${amount}`
+            : "Loading payment gateway…"}
         </button>
       </main>
     </>

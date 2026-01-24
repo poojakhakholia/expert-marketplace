@@ -1,0 +1,112 @@
+@import "tailwindcss";
+
+/* ============================
+   BASE TYPOGRAPHY / RESET
+============================ */
+
+:root {
+  --intella-orange: #f97316; /* orange-500 */
+  --intella-orange-hover: #ea580c; /* orange-600 */
+
+  --intella-sky-from: #bae6fd; /* sky-200 */
+  --intella-sky-via: #e0f2fe;  /* sky-100 */
+  --intella-sky-to: #ffffff;
+}
+
+body {
+  color: theme(colors.slate.700);
+  background-color: white;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+/* ============================
+   INTELLA UTILITIES
+============================ */
+
+/* Page background (used across pages) */
+.intella-page {
+  background: linear-gradient(
+    to bottom,
+    var(--intella-sky-from),
+    var(--intella-sky-via),
+    var(--intella-sky-to)
+  );
+}
+
+/* Consistent vertical rhythm */
+.intella-section {
+  padding-top: 5rem;  /* 80px */
+  padding-bottom: 5rem;
+}
+
+/* Cards */
+.intella-card {
+  background: white;
+  border-radius: 1.25rem; /* 20px */
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.06);
+}
+
+/* Floating hover card */
+.intella-card-float:hover {
+  box-shadow: 0 16px 40px rgba(0, 0, 0, 0.1);
+}
+
+/* Primary CTA (orange) */
+.intella-btn-primary {
+  background-color: var(--intella-orange);
+  color: white;
+  border-radius: 9999px;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  transition: background-color 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 10px 24px rgba(249, 115, 22, 0.35);
+}
+
+.intella-btn-primary:hover {
+  background-color: var(--intella-orange-hover);
+}
+
+/* Secondary button */
+.intella-btn-secondary {
+  background: white;
+  color: theme(colors.slate.700);
+  border-radius: 9999px;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 500;
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.08);
+  transition: box-shadow 0.2s ease;
+}
+
+.intella-btn-secondary:hover {
+  box-shadow: 0 14px 30px rgba(0, 0, 0, 0.12);
+}
+
+/* Chips */
+.intella-chip {
+  border-radius: 9999px;
+  padding: 0.5rem 1.25rem;
+  font-size: 0.875rem;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.08);
+  transition: all 0.2s ease;
+}
+
+.intella-chip-active {
+  background-color: var(--intella-orange);
+  color: white;
+}
+
+.intella-chip-inactive {
+  background: white;
+  color: theme(colors.slate.700);
+}
+
+/* Inputs */
+.intella-input {
+  width: 100%;
+  background: transparent;
+  font-size: 0.875rem;
+  outline: none;
+}

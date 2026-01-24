@@ -1,0 +1,288 @@
+'use client'
+
+import { useEffect, useRef, useState } from 'react'
+import Link from 'next/link'
+import { supabase } from '@/lib/supabase'
+
+type Expert = {
+  user_id: string
+  full_name: string | null
+  headline: string | null
+  bio: string | null
+  company: string | null
+  domain: string | null
+  city: string | null
+  country: string | null
+
+  category_slugs: string[] | null
+  category_names: string[] | null
+
+  average_rating: number | null
+  total_reviews: number | null
+
+  fee_15: number | null
+  fee_30: number | null
+  fee_45: number | null
+  fee_60: number | null
+  profile_image_url: string | null
+}
+
+const PAGE_SIZE = 24
+
+const categoryEmojiMap: Record<string, string> = {
+  business: '💼',
+  career: '🚀',
+  startup: '🚀',
+  health: '❤️',
+  design: '🎨',
+  product: '📦',
+  education: '🎓',
+  lifestyle: '🌍',
+  finance: '💰',
+  fitness: '🏋️',
+  sports: '🏅',
+  cooking: '🍳',
+  travel: '✈️',
+  artist: '🎨',
+}
+
+export default function ExplorePage() {
+  const [experts, setExperts] = useState<Expert[]>([])
+  const [availableCategories, setAvailableCategories] = useState<
+    { slug: string; name: string }[]
+  >([])
+  const [selectedCategory, setSelectedCategory] = useState<string | null>(null)
+
+  const [searchQuery, setSearchQuery] = useState('')
+  const [offset, setOffset] = useState(0)
+  const [hasMore, setHasMore] = useState(true)
+  const [loading, setLoading] = useState(false)
+  const [relaxedQuality, setRelaxedQuality] = useState(false)
+
+  const didInit = useRef(false)
+
+  /* ===========================
+     INITIAL LOAD (UNFILTERED)
+  =========================== */
+  useEffect(() => {
+    fetchExperts(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  /* ===========================
+     REFETCH ON SEARCH / CHIP
+  =========================== */
+  useEffect(() => {
+    if (!didInit.current) {
+      didInit.current = true
+      return
+    }
+
+    setExperts([])
+    setOffset(0)
+    setHasMore(true)
+    setRelaxedQuality(false)
+
+    fetchExperts(true)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery, selectedCategory])
+
+  /* ===========================
+     FETCH EXPERTS (FIXED)
+  =========================== */
+  async function fetchExperts(reset = false) {
+    if (loading || (!hasMore && !reset)) return
+    setLoading(true)
+
+    let query = supabase
+      .from('public_expert_search')
+      .select('*')
+
+    // 🔍 Search
+    if (searchQuery.trim()) {
+      const q = `%${searchQuery.trim()}%`
+      query = query.or(
+        [
+          `full_name.ilike.${q}`,
+          `headline.ilike.${q}`,
+          `bio.ilike.${q}`,
+          `company.ilike.${q}`,
+          `domain.ilike.${q}`,
+          `city.ilike.${q}`,
+          `country.ilike.${q}`,
+        ].join(',')
+      )
+    }
+
+    // ✅ Category filter (canonical, DB-safe)
+    if (selectedCategory) {
+      query = query.contains('category_slugs', [selectedCategory])
+    }
+
+    // 🔑 KEY FIX: disable pagination when filtering
+    const effectiveOffset = selectedCategory ? 0 : offset
+
+    const { data: primary } = await query
+      .or('average_rating.gte.4.5,average_rating.is.null')
+      .order('average_rating', { ascending: false, nullsFirst: false })
+      .order('total_reviews', { ascending: false })
+      .range(effectiveOffset, effectiveOffset + PAGE_SIZE - 1)
+
+    let results = primary ?? []
+
+    // Relax quality only when NOT filtering
+    if (!selectedCategory && results.length < PAGE_SIZE && !relaxedQuality) {
+      const remaining = PAGE_SIZE - results.length
+
+      const { data: fallback } = await query
+        .order('average_rating', { ascending: false, nullsFirst: false })
+        .order('total_reviews', { ascending: false })
+        .range(0, remaining - 1)
+
+      results = [
+        ...results,
+        ...(fallback ?? []).filter(
+          e => !results.some(r => r.user_id === e.user_id)
+        ),
+      ]
+
+      setRelaxedQuality(true)
+    }
+
+    // Build category chips ONCE from unfiltered data
+    if (reset && availableCategories.length === 0 && !selectedCategory) {
+      const map = new Map<string, string>()
+
+      results.forEach(e => {
+        e.category_slugs?.forEach((slug, idx) => {
+          const name = e.category_names?.[idx]
+          if (slug && name) map.set(slug, name)
+        })
+      })
+
+      setAvailableCategories(
+        Array.from(map.entries()).map(([slug, name]) => ({ slug, name }))
+      )
+    }
+
+    setExperts(prev => (reset ? results : [...prev, ...results]))
+
+    // ⛔ do NOT advance offset when filtering
+    if (!selectedCategory) {
+      setOffset(prev => prev + PAGE_SIZE)
+    }
+
+    if (results.length < PAGE_SIZE) setHasMore(false)
+
+    setLoading(false)
+  }
+
+  function getMinPrice(e: Expert) {
+    return Math.min(
+      ...[e.fee_15, e.fee_30, e.fee_45, e.fee_60].filter(
+        (v): v is number => typeof v === 'number'
+      )
+    )
+  }
+
+  function toggleChip(slug: string) {
+    setSelectedCategory(prev => (prev === slug ? null : slug))
+  }
+
+  /* ===========================
+     UI
+  =========================== */
+  return (
+    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-50 to-white py-32">
+      <div className="mx-auto max-w-7xl px-6">
+
+        <div className="text-center">
+          <h1 className="text-4xl font-semibold text-slate-800">
+            Explore conversations
+          </h1>
+          <p className="mt-4 text-slate-600">
+            Find people to learn from and book one-to-one paid conversations.
+          </p>
+        </div>
+
+        <div className="mt-12 rounded-2xl bg-white p-4 shadow-sm">
+          <div className="flex items-center gap-2 rounded-xl border px-4 py-2">
+            <span>🔍</span>
+            <input
+              value={searchQuery}
+              onChange={e => setSearchQuery(e.target.value)}
+              placeholder="Search topics or hosts"
+              className="w-full outline-none text-sm"
+            />
+          </div>
+        </div>
+
+        {availableCategories.length > 0 && (
+          <div className="mt-8 flex flex-wrap justify-center gap-3">
+            {availableCategories.map(c => (
+              <button
+                key={c.slug}
+                onClick={() => toggleChip(c.slug)}
+                className={`rounded-full px-5 py-2 text-sm shadow-sm transition ${
+                  selectedCategory === c.slug
+                    ? 'bg-blue-600 text-white'
+                    : 'bg-white text-slate-700'
+                }`}
+              >
+                {categoryEmojiMap[c.slug] ?? '💡'} {c.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
+          {experts.map(e => (
+            <Link
+              key={e.user_id}
+              href={`/experts/${e.user_id}`}
+              className="rounded-3xl bg-white p-6 shadow-sm"
+            >
+              <div className="h-40 mb-4 rounded-2xl bg-slate-100 flex items-center justify-center text-4xl">
+                {e.profile_image_url ? (
+                  <img
+                    src={e.profile_image_url}
+                    className="h-full w-full object-cover rounded-2xl"
+                  />
+                ) : (
+                  e.full_name?.[0]
+                )}
+              </div>
+
+              <h3 className="font-semibold">{e.full_name}</h3>
+              <div className="h-5 text-xs text-slate-500">{e.company}</div>
+              <div className="h-10 text-sm text-slate-600">{e.headline}</div>
+
+              <div className="mt-3 flex flex-wrap gap-2">
+                {e.category_names?.map(n => (
+                  <span
+                    key={n}
+                    className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full"
+                  >
+                    {n}
+                  </span>
+                ))}
+              </div>
+
+              <div className="mt-4 flex justify-between items-center">
+                <span className="text-sm">
+                  {e.average_rating ? `⭐ ${e.average_rating}` : 'New'}
+                </span>
+                <span className="font-medium">₹{getMinPrice(e)}</span>
+              </div>
+
+              <button className="mt-4 w-full bg-blue-600 text-white rounded-xl py-2">
+                View details
+              </button>
+            </Link>
+          ))}
+        </div>
+
+      </div>
+    </main>
+  )
+}
