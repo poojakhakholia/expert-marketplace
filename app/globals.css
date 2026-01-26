@@ -14,7 +14,7 @@
 }
 
 body {
-  color: theme(colors.slate.700);
+  color: #334155; /* slate-700 */
   background-color: white;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
@@ -71,7 +71,7 @@ body {
 /* Secondary button */
 .intella-btn-secondary {
   background: white;
-  color: theme(colors.slate.700);
+  color: #334155; /* slate-700 */
   border-radius: 9999px;
   padding: 0.75rem 1.5rem;
   font-size: 0.875rem;
@@ -100,7 +100,7 @@ body {
 
 .intella-chip-inactive {
   background: white;
-  color: theme(colors.slate.700);
+  color: #334155; /* slate-700 */
 }
 
 /* Inputs */

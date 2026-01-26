@@ -9,6 +9,7 @@ function StarIcon() {
       height="14"
       viewBox="0 0 24 24"
       fill="#FACC15"
+      className="shrink-0"
     >
       <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
     </svg>
@@ -54,43 +55,50 @@ export default function HostReviews({
   if (!reviews.length) return null
 
   return (
-    <section className="mx-auto max-w-6xl px-6">
-      <div className="rounded-2xl bg-white p-8 shadow-sm">
-
-        <h2 className="mb-6 text-xl font-semibold text-gray-900">
-          What people say
+    <section>
+      {/* Header */}
+      <div className="mb-4">
+        <h2 className="text-[15px] font-semibold text-slate-900 tracking-tight">
+          Recent conversations
         </h2>
-
-        <div className="space-y-6">
-          {reviews.slice(0, 3).map((review, index) => (
-            <div
-              key={index}
-              className="rounded-xl bg-slate-50 p-5"
-            >
-              <div className="mb-2 flex items-center gap-2">
-                <div className="font-medium text-gray-900">
-                  {review.name}
-                </div>
-                <div className="flex items-center gap-1">
-                  {Array.from({ length: review.rating }).map((_, i) => (
-                    <StarIcon key={i} />
-                  ))}
-                </div>
-              </div>
-
-              <p className="text-sm leading-relaxed text-gray-700">
-                {review.text}
-              </p>
-            </div>
-          ))}
-        </div>
-
-        {/* Future extension */}
-        <div className="mt-6 text-sm text-orange-600 cursor-pointer">
-          View all reviews →
-        </div>
-
+        <p className="mt-1 text-[14px] text-slate-600">
+          What people felt after talking one-on-one
+        </p>
       </div>
+
+      {/* Reviews */}
+      <div className="space-y-6">
+        {reviews.slice(0, 3).map((review, index) => (
+          <div key={index} className="max-w-3xl">
+            {/* Reviewer meta */}
+            <div className="mb-1 flex items-center gap-2">
+              <span className="font-medium text-slate-900 text-[14px]">
+                {review.name}
+              </span>
+
+              <span className="flex items-center gap-1">
+                {Array.from({ length: review.rating }).map((_, i) => (
+                  <StarIcon key={i} />
+                ))}
+              </span>
+
+              <span className="text-slate-400 text-[13px]">
+                · Verified conversation
+              </span>
+            </div>
+
+            {/* Review text */}
+            <p className="text-[14px] leading-relaxed text-slate-700">
+              “{review.text}”
+            </p>
+          </div>
+        ))}
+      </div>
+
+      {/* Soft CTA */}
+      <button className="mt-6 text-[14px] font-medium text-[#F97316] hover:underline">
+        View all conversations →
+      </button>
     </section>
   )
 }

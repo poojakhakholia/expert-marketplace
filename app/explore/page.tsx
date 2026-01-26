@@ -62,7 +62,7 @@ export default function ExplorePage() {
   const didInit = useRef(false)
 
   /* ===========================
-     INITIAL LOAD (UNFILTERED)
+     INITIAL LOAD
   =========================== */
   useEffect(() => {
     fetchExperts(true)
@@ -88,7 +88,7 @@ export default function ExplorePage() {
   }, [searchQuery, selectedCategory])
 
   /* ===========================
-     FETCH EXPERTS (FIXED)
+     FETCH EXPERTS
   =========================== */
   async function fetchExperts(reset = false) {
     if (loading || (!hasMore && !reset)) return
@@ -98,7 +98,6 @@ export default function ExplorePage() {
       .from('public_expert_search')
       .select('*')
 
-    // 🔍 Search
     if (searchQuery.trim()) {
       const q = `%${searchQuery.trim()}%`
       query = query.or(
@@ -114,12 +113,10 @@ export default function ExplorePage() {
       )
     }
 
-    // ✅ Category filter (canonical, DB-safe)
     if (selectedCategory) {
       query = query.contains('category_slugs', [selectedCategory])
     }
 
-    // 🔑 KEY FIX: disable pagination when filtering
     const effectiveOffset = selectedCategory ? 0 : offset
 
     const { data: primary } = await query
@@ -130,7 +127,6 @@ export default function ExplorePage() {
 
     let results = primary ?? []
 
-    // Relax quality only when NOT filtering
     if (!selectedCategory && results.length < PAGE_SIZE && !relaxedQuality) {
       const remaining = PAGE_SIZE - results.length
 
@@ -149,7 +145,6 @@ export default function ExplorePage() {
       setRelaxedQuality(true)
     }
 
-    // Build category chips ONCE from unfiltered data
     if (reset && availableCategories.length === 0 && !selectedCategory) {
       const map = new Map<string, string>()
 
@@ -167,7 +162,6 @@ export default function ExplorePage() {
 
     setExperts(prev => (reset ? results : [...prev, ...results]))
 
-    // ⛔ do NOT advance offset when filtering
     if (!selectedCategory) {
       setOffset(prev => prev + PAGE_SIZE)
     }
@@ -193,9 +187,10 @@ export default function ExplorePage() {
      UI
   =========================== */
   return (
-    <main className="min-h-screen bg-gradient-to-b from-blue-50 via-blue-50 to-white py-32">
-      <div className="mx-auto max-w-7xl px-6">
+    <main className="min-h-screen intella-page">
+      <div className="mx-auto max-w-7xl px-6 intella-section">
 
+        {/* Header */}
         <div className="text-center">
           <h1 className="text-4xl font-semibold text-slate-800">
             Explore conversations
@@ -205,28 +200,30 @@ export default function ExplorePage() {
           </p>
         </div>
 
-        <div className="mt-12 rounded-2xl bg-white p-4 shadow-sm">
-          <div className="flex items-center gap-2 rounded-xl border px-4 py-2">
+        {/* Search */}
+        <div className="mt-12 intella-card p-4">
+          <div className="flex items-center gap-2 rounded-xl border border-slate-200 px-4 py-2">
             <span>🔍</span>
             <input
               value={searchQuery}
               onChange={e => setSearchQuery(e.target.value)}
               placeholder="Search topics or hosts"
-              className="w-full outline-none text-sm"
+              className="intella-input"
             />
           </div>
         </div>
 
+        {/* Category Chips */}
         {availableCategories.length > 0 && (
           <div className="mt-8 flex flex-wrap justify-center gap-3">
             {availableCategories.map(c => (
               <button
                 key={c.slug}
                 onClick={() => toggleChip(c.slug)}
-                className={`rounded-full px-5 py-2 text-sm shadow-sm transition ${
+                className={`intella-chip ${
                   selectedCategory === c.slug
-                    ? 'bg-blue-600 text-white'
-                    : 'bg-white text-slate-700'
+                    ? 'intella-chip-active'
+                    : 'intella-chip-inactive'
                 }`}
               >
                 {categoryEmojiMap[c.slug] ?? '💡'} {c.name}
@@ -235,18 +232,19 @@ export default function ExplorePage() {
           </div>
         )}
 
+        {/* Cards */}
         <div className="mt-16 grid gap-8 sm:grid-cols-2 lg:grid-cols-3">
           {experts.map(e => (
             <Link
               key={e.user_id}
               href={`/experts/${e.user_id}`}
-              className="rounded-3xl bg-white p-6 shadow-sm"
+              className="intella-card intella-card-float p-6"
             >
-              <div className="h-40 mb-4 rounded-2xl bg-slate-100 flex items-center justify-center text-4xl">
+              <div className="mb-4 h-40 rounded-2xl bg-slate-100 flex items-center justify-center text-4xl overflow-hidden">
                 {e.profile_image_url ? (
                   <img
                     src={e.profile_image_url}
-                    className="h-full w-full object-cover rounded-2xl"
+                    className="h-full w-full object-cover"
                   />
                 ) : (
                   e.full_name?.[0]
@@ -261,7 +259,7 @@ export default function ExplorePage() {
                 {e.category_names?.map(n => (
                   <span
                     key={n}
-                    className="text-xs bg-blue-50 text-blue-700 px-2 py-1 rounded-full"
+                    className="text-xs bg-slate-100 text-slate-600 px-2 py-1 rounded-full"
                   >
                     {n}
                   </span>
@@ -275,7 +273,7 @@ export default function ExplorePage() {
                 <span className="font-medium">₹{getMinPrice(e)}</span>
               </div>
 
-              <button className="mt-4 w-full bg-blue-600 text-white rounded-xl py-2">
+              <button className="mt-4 w-full intella-btn-primary">
                 View details
               </button>
             </Link>

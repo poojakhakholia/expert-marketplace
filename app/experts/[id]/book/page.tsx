@@ -18,22 +18,14 @@ import { CalendarDays, Clock, Timer } from 'lucide-react'
    Helpers
 ---------------------------------------- */
 
-const DAY_MAP: Record<string, number> = {
-  sunday: 0,
-  monday: 1,
-  tuesday: 2,
-  wednesday: 3,
-  thursday: 4,
-  friday: 5,
-  saturday: 6,
-}
-
-function normalizeDay(value: any): number | null {
-  if (typeof value === 'number') return value
-  if (typeof value === 'string') {
-    return DAY_MAP[value.toLowerCase()] ?? null
-  }
-  return null
+/**
+ * DB: Monday = 0 ... Sunday = 6
+ * JS: Sunday = 0 ... Saturday = 6
+ *
+ * Convert DB day → JS day
+ */
+function dbDayToJsDay(dbDay: number): number {
+  return (dbDay + 1) % 7
 }
 
 /* ----------------------------------------
@@ -47,9 +39,7 @@ export default function ExpertBookingPage() {
   const [availability, setAvailability] = useState<any[]>([])
   const [bookings, setBookings] = useState<any[]>([])
 
-  // 🔧 CHANGE 1: no default date
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
-
   const [duration, setDuration] = useState<number | null>(null)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
@@ -75,20 +65,20 @@ export default function ExpertBookingPage() {
       setAvailability(availability || [])
       setLoading(false)
 
-      // 🔧 CHANGE 2: auto-select NEXT available day (after today)
+      // auto-select next available day
       if (availability && availability.length > 0) {
-        const availableDays = new Set(
-          availability.map(a => Number(a.day_of_week))
+        const availableJsDays = new Set(
+          availability.map(a => dbDayToJsDay(a.day_of_week))
         )
 
         const start = new Date()
-        start.setDate(start.getDate() + 1) // ⬅️ tomorrow only
+        start.setDate(start.getDate() + 1)
 
         for (let i = 0; i < 14; i++) {
           const d = new Date(start)
           d.setDate(start.getDate() + i)
 
-          if (availableDays.has(d.getDay())) {
+          if (availableJsDays.has(d.getDay())) {
             setSelectedDate(d)
             break
           }
@@ -132,7 +122,7 @@ export default function ExpertBookingPage() {
   }
 
   /* ----------------------------------------
-     Availability filtering
+     Availability for selected day
   ---------------------------------------- */
 
   const selectedDay =
@@ -142,32 +132,16 @@ export default function ExpertBookingPage() {
     selectedDay === null
       ? []
       : availability.filter(a => {
-          const day = normalizeDay(a.day_of_week)
-          return day === selectedDay
+          const jsDay = dbDayToJsDay(a.day_of_week)
+          return jsDay === selectedDay
         })
 
   /* ----------------------------------------
-     Duration allowed (window based)
-  ---------------------------------------- */
-
-  const isDurationAllowed =
-    duration !== null &&
-    dayAvailability.some(a => {
-      if (!a.start_time || !a.end_time) return false
-
-      const [sh, sm] = a.start_time.split(':').map(Number)
-      const [eh, em] = a.end_time.split(':').map(Number)
-
-      const windowMinutes = eh * 60 + em - (sh * 60 + sm)
-      return windowMinutes >= duration
-    })
-
-  /* ----------------------------------------
-     Slot generation
+     Slot generation (NO premature filtering)
   ---------------------------------------- */
 
   const slots =
-    selectedDate && duration && isDurationAllowed
+    selectedDate && duration
       ? generateSlots({
           availability: dayAvailability,
           bookings,

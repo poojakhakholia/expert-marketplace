@@ -2,19 +2,37 @@
 
 import { useState } from 'react'
 
-/* ---------- Icon ---------- */
+/* ---------- Topic Icon Resolver ---------- */
 
-function HeartIcon() {
-  return (
-    <svg
-      width="20"
-      height="20"
-      viewBox="0 0 24 24"
-      fill="#F97316"
-    >
-      <path d="M12 21s-6.7-4.35-9.33-7.43C-1.5 9.13 1.4 3.5 6.5 5.5c2.1.83 3.5 3 3.5 3s1.4-2.17 3.5-3c5.1-2 8 3.63 3.83 8.07C18.7 16.65 12 21 12 21z" />
-    </svg>
-  )
+function TopicIcon({ topic }: { topic: string }) {
+  const t = topic.toLowerCase()
+
+  if (t.includes('weight') || t.includes('fitness')) {
+    return <span className="text-[#F97316] text-[16px]">🏋️</span>
+  }
+
+  if (t.includes('strength')) {
+    return <span className="text-[#F97316] text-[16px]">💪</span>
+  }
+
+  if (t.includes('diet') || t.includes('nutrition')) {
+    return <span className="text-[#F97316] text-[16px]">🥗</span>
+  }
+
+  if (t.includes('career') || t.includes('work')) {
+    return <span className="text-[#F97316] text-[16px]">💼</span>
+  }
+
+  if (t.includes('startup') || t.includes('business')) {
+    return <span className="text-[#F97316] text-[16px]">🚀</span>
+  }
+
+  if (t.includes('confidence') || t.includes('mindset')) {
+    return <span className="text-[#F97316] text-[16px]">🧠</span>
+  }
+
+  // neutral fallback
+  return <span className="text-[#F97316] text-[16px]">✨</span>
 }
 
 /* ---------- Types ---------- */
@@ -25,65 +43,46 @@ type HostTopicsProps = {
 
 /* ---------- Component ---------- */
 
-export default function HostTopics({
-  topics = [
-    'Starting your first startup',
-    'Scaling a small business',
-    'Improving your marketing',
-    'Balancing work & life',
-    'Career transitions',
-    'Building confidence',
-    'Freelancing & side hustles',
-    'Personal growth & clarity',
-  ],
-}: HostTopicsProps) {
-  const [expanded, setExpanded] = useState(false)
+export default function HostTopics({ topics = [] }: HostTopicsProps) {
+  if (!topics.length) return null
 
-  const visibleTopics = expanded ? topics : topics.slice(0, 4)
+  const [expanded, setExpanded] = useState(false)
+  const visibleTopics = expanded ? topics : topics.slice(0, 6)
 
   return (
-    <section className="mx-auto max-w-6xl px-6">
-      <div className="rounded-2xl bg-white p-8 shadow-sm">
-
-        {/* Header */}
-        <div className="mb-2 flex items-center gap-3">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-orange-50">
-            <HeartIcon />
-          </div>
-          <h2 className="text-xl font-semibold text-gray-900">
-            Topics I can help with
-          </h2>
-        </div>
-
-        <p className="mb-6 text-sm text-gray-600">
+    <section>
+      {/* Header */}
+      <div className="mb-1">
+        <h2 className="text-[15px] font-semibold text-slate-900 tracking-tight">
+          Topics I can help with
+        </h2>
+        <p className="mt-1 text-[14px] text-slate-600">
           Things I enjoy chatting about one-on-one
         </p>
-
-        {/* Topics grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-          {visibleTopics.map((topic, index) => (
-            <div
-              key={index}
-              className="rounded-xl bg-slate-50 px-4 py-3 text-sm text-gray-800 shadow-sm"
-            >
-              {topic}
-            </div>
-          ))}
-        </div>
-
-        {/* Expand toggle */}
-        {topics.length > 4 && (
-          <div className="mt-6">
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="text-sm font-medium text-orange-600 hover:underline"
-            >
-              {expanded ? 'Show less' : 'View all topics'}
-            </button>
-          </div>
-        )}
-
       </div>
+
+      {/* Chips */}
+      <div className="mt-4 flex flex-wrap gap-2 max-w-4xl">
+        {visibleTopics.map((topic, index) => (
+          <span
+            key={index}
+            className="inline-flex items-center gap-2 rounded-full border border-slate-200 bg-white px-4 py-2 text-[14px] text-slate-800 shadow-sm"
+          >
+            <TopicIcon topic={topic} />
+            <span className="leading-none">{topic}</span>
+          </span>
+        ))}
+      </div>
+
+      {/* Expand toggle */}
+      {topics.length > 6 && (
+        <button
+          onClick={() => setExpanded(!expanded)}
+          className="mt-3 text-[14px] font-medium text-[#F97316] hover:underline"
+        >
+          {expanded ? 'Show less' : 'View all topics'}
+        </button>
+      )}
     </section>
   )
 }

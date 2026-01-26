@@ -3,7 +3,7 @@
 export const dynamic = 'force-dynamic'
 
 import { useEffect, useState } from 'react'
-import { useParams, notFound } from 'next/navigation'
+import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
 /* ---------- Components (FROZEN) ---------- */
@@ -12,7 +12,6 @@ import HostAbout from './components/HostAbout'
 import HostTopics from './components/HostTopics'
 import HostQuickFacts from './components/HostQuickFacts'
 import HostReviews from './components/HostReviews'
-import HostFAQs from './components/HostFAQs'
 
 /* ---------- Types ---------- */
 
@@ -50,7 +49,6 @@ export default function ExpertProfilePage() {
   async function fetchExpert() {
     setLoading(true)
 
-    /* 1️⃣ Canonical public view */
     const { data: publicRow, error } = await supabase
       .from('public_expert_search')
       .select('*')
@@ -63,7 +61,6 @@ export default function ExpertProfilePage() {
       return
     }
 
-    /* 2️⃣ Profile extras */
     const { data: profile } = await supabase
       .from('expert_profiles')
       .select(
@@ -100,60 +97,75 @@ export default function ExpertProfilePage() {
     setLoading(false)
   }
 
+  /* ---------- Loading / Error ---------- */
+
   if (loading) {
     return (
-      <main className="mx-auto max-w-6xl px-6 py-20 text-gray-500">
-        Loading profile…
+      <main className="relative min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
+        <div className="mx-auto max-w-6xl px-6 py-24 text-slate-500">
+          Loading profile…
+        </div>
       </main>
     )
   }
 
   if (!expert) {
     return (
-      <main className="mx-auto max-w-6xl px-6 py-20 text-gray-500">
-        Profile not found.
+      <main className="relative min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
+        <div className="mx-auto max-w-6xl px-6 py-24 text-slate-500">
+          Profile not found.
+        </div>
       </main>
     )
   }
 
+  /* ---------- Main ---------- */
+
   return (
-    <main className="min-h-screen bg-[#FAFAFA]">
+    <main className="relative min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
+      {/* Soft Intella atmospheric glow (lighter than Home) */}
+      <div className="pointer-events-none absolute -top-48 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-sky-200/25 blur-[180px]" />
 
-      {/* 1️⃣ Banner */}
-      <HostProfileBanner expert={expert} />
+      {/* Content rail */}
+      <div className="relative z-10 mx-auto max-w-6xl px-6">
+        {/* Banner */}
+        <HostProfileBanner expert={expert} />
 
-      {/* 2️⃣ About */}
-      <div className="mt-16">
-        <HostAbout bio={expert.bio || ''} />
+        {/* Unified content surface */}
+        <div className="mt-6 rounded-3xl bg-white/70 backdrop-blur border border-slate-200/60 px-6 md:px-8 pb-16">
+
+          {/* 2-column layout */}
+          <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-10 pt-8">
+
+            {/* LEFT: narrative */}
+            <div className="space-y-6">
+              <HostAbout bio={expert.bio || ''} />
+
+              {/* subtle divider */}
+              <div className="h-px bg-slate-200/50" />
+
+              <HostTopics topics={expert.topics} />
+
+              {/* subtle divider */}
+              <div className="h-px bg-slate-200/50" />
+
+              <HostReviews />
+            </div>
+
+            {/* RIGHT: quick facts (supporting) */}
+            <aside className="md:pt-2">
+              <HostQuickFacts
+                designation={expert.designation}
+                company={expert.company}
+                experience_years={expert.experience_years}
+                conversations_count={expert.conversations_count}
+                city={expert.city}
+                country={expert.country}
+              />
+            </aside>
+          </div>
+        </div>
       </div>
-
-      {/* 3️⃣ Topics */}
-      <div className="mt-16">
-        <HostTopics topics={expert.topics} />
-      </div>
-
-      {/* 4️⃣ Quick Facts */}
-      <div className="mt-16">
-        <HostQuickFacts
-          designation={expert.designation}
-          company={expert.company}
-          experience_years={expert.experience_years}
-          conversations_count={expert.conversations_count}
-          city={expert.city}
-          country={expert.country}
-        />
-      </div>
-
-      {/* 5️⃣ Reviews */}
-      <div className="mt-16">
-        <HostReviews />
-      </div>
-
-      {/* 6️⃣ FAQs */}
-      <div className="mt-16">
-        <HostFAQs />
-      </div>
-
     </main>
   )
 }

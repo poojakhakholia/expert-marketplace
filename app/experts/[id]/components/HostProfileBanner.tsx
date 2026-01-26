@@ -20,102 +20,78 @@ function UsersIcon() {
   )
 }
 
-function MapPinIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M12 2C8.13 2 5 5.13 5 9c0 5.25 7 13 7 13s7-7.75 7-13c0-3.87-3.13-7-7-7zm0 9.5c-1.38 0-2.5-1.12-2.5-2.5S10.62 6.5 12 6.5s2.5 1.12 2.5 2.5S13.38 11.5 12 11.5z" />
-    </svg>
-  )
-}
-
-/* ---------- Component ---------- */
+/* ---------- Types ---------- */
 
 type HostProfileBannerProps = {
   expert: {
     full_name: string
     headline?: string
-    city?: string
-    country?: string
     profile_image_url?: string
-    linkedin_url?: string
-    twitter_url?: string
     rating?: number
     conversations_count?: number
   }
 }
+
+/* ---------- Component ---------- */
 
 export default function HostProfileBanner({ expert }: HostProfileBannerProps) {
   const router = useRouter()
   const { id } = useParams()
 
   return (
-    <section className="relative w-full overflow-hidden">
+    <section className="relative w-full">
+      {/* Content rail is owned by page */}
+      <div className="py-10 md:py-14">
+        <div className="flex flex-col md:flex-row items-center md:items-start gap-8">
 
-      {/* Banner background */}
-      <div
-        className="absolute inset-0 bg-cover bg-center pointer-events-none"
-        style={{ backgroundImage: "url('/branding/clouds-bg.png')" }}
-      />
-      <div className="absolute inset-0 bg-white/25 pointer-events-none" />
-
-      <div className="relative z-10 px-6 py-24">
-        <div className="mx-auto max-w-6xl">
-
-          <div className="relative overflow-hidden rounded-[32px] shadow-md">
-            <div
-              className="absolute inset-0 bg-cover bg-center pointer-events-none"
-              style={{ backgroundImage: "url('/branding/profile-card-bg.png')" }}
+          {/* Avatar */}
+          <div className="h-32 w-32 shrink-0 rounded-full overflow-hidden bg-white shadow-md ring-4 ring-white">
+            <img
+              src={expert.profile_image_url || '/branding/profile-placeholder.png'}
+              alt={expert.full_name}
+              className="h-full w-full object-cover"
             />
-            <div className="absolute inset-0 bg-white/80 pointer-events-none" />
+          </div>
 
-            <div className="relative z-10 flex flex-col md:flex-row items-center gap-10 px-8 py-10">
+          {/* Identity + Actions */}
+          <div className="flex-1 text-center md:text-left">
 
-              {/* Avatar */}
-              <div className="h-40 w-40 rounded-full border-[5px] border-white shadow-lg overflow-hidden bg-gray-200">
-                <img
-                  src={expert.profile_image_url || '/branding/profile-placeholder.png'}
-                  alt={expert.full_name}
-                  className="h-full w-full object-cover"
-                />
-              </div>
+            <h1 className="text-[30px] md:text-[34px] font-semibold text-slate-900 tracking-tight">
+              {expert.full_name}
+            </h1>
 
-              {/* Info */}
-              <div className="flex-1 space-y-4 text-center md:text-left">
+            {/* Intella micro-accent */}
+            <div className="mt-1 h-[3px] w-10 rounded-full bg-[#F97316]/80 mx-auto md:mx-0" />
 
-                <h1 className="text-[32px] md:text-[36px] font-semibold text-gray-900">
-                  {expert.full_name}
-                </h1>
+            <p className="mt-2 text-[16px] md:text-[17px] text-slate-700 italic">
+              {expert.headline || 'Sharing experience through meaningful conversations'}
+            </p>
 
-                <p className="text-[18px] md:text-[20px] text-gray-700 italic">
-                  {expert.headline || 'Sharing experience through meaningful conversations'}
-                </p>
+            <div className="mt-5 flex flex-wrap justify-center md:justify-start items-center gap-4">
 
-                <div className="flex flex-wrap justify-center md:justify-start gap-4 pt-4">
+              {/* Primary CTA (unchanged) */}
+              <button
+                onClick={() => router.push(`/experts/${id}/book`)}
+                className="rounded-full bg-[#F97316] px-7 py-3 text-white font-medium hover:bg-[#EA6A0F] transition"
+              >
+                Book a conversation
+              </button>
 
-                  {/* ✅ WORKING CTA */}
-                  <button
-                    onClick={() => router.push(`/experts/${id}/book`)}
-                    className="rounded-full bg-[#F97316] px-7 py-3 text-white font-medium hover:bg-[#EA6A0F] transition"
-                  >
-                    Book a conversation
-                  </button>
-
-                  <div className="flex items-center gap-2 rounded-full border bg-white px-4 py-2 text-sm shadow-sm">
-                    <StarIcon />
-                    <span className="font-medium">{expert.rating ?? '4.9'}</span>
-                    <span className="text-gray-400">·</span>
-                    <UsersIcon />
-                    <span className="text-gray-600">
-                      {expert.conversations_count ?? '128'} conversations
-                    </span>
-                  </div>
-
-                </div>
+              {/* Meta (softly grounded) */}
+              <div className="flex items-center gap-2 rounded-full bg-orange-50/60 px-4 py-2 text-sm text-slate-600">
+                <StarIcon />
+                <span className="font-medium text-slate-900">
+                  {expert.rating ?? '4.9'}
+                </span>
+                <span className="text-slate-400">·</span>
+                <UsersIcon />
+                <span>
+                  {expert.conversations_count ?? '0'} conversations
+                </span>
               </div>
 
             </div>
           </div>
-
         </div>
       </div>
     </section>

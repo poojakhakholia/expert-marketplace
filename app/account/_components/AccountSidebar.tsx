@@ -61,7 +61,9 @@ export default function AccountSidebar() {
 
   useEffect(() => {
     const load = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
+      const {
+        data: { session },
+      } = await supabase.auth.getSession();
       if (!session) return;
 
       const userId = session.user.id;
@@ -117,7 +119,9 @@ export default function AccountSidebar() {
   };
 
   const viewPublicProfile = async () => {
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
     if (!session) return;
     router.push(`/experts/${session.user.id}`);
   };
@@ -137,9 +141,12 @@ export default function AccountSidebar() {
       <div className="space-y-1">
         {navItem("Profile", <IconUser />, "/account/profile")}
 
+        {/* 🔹 LABEL CHANGE ONLY */}
+        {navItem("My Conversations", <IconInbox />, "/account/sessions")}
+
         {expertStatus === "none" && (
           <>
-            {navItem("My Orders", <IconOrders />, "/account/orders/placed")}
+            {navItem("Orders", <IconOrders />, "/account/orders/placed")}
             <Divider />
             {navItem(
               "Become a Host",

@@ -78,8 +78,10 @@ export default function TestPaymentPage() {
       order_id: order.order_id,
 
       handler: async function (response: any) {
+        console.log("RAZORPAY RESPONSE:", response); // 🔥 optional, helps debugging
+
         try {
-          // 3. Verify payment (NO booking confirmation here)
+          // 3. Verify payment
           const verifyRes = await fetch("/api/payments/verify", {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -87,6 +89,7 @@ export default function TestPaymentPage() {
               booking_id: bookingId,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_order_id: response.razorpay_order_id,
+              razorpay_signature: response.razorpay_signature, // 🔥 FIX
             }),
           });
 
@@ -96,7 +99,7 @@ export default function TestPaymentPage() {
             return;
           }
 
-          // 4. Redirect user to booking details
+          // 4. Redirect user after success
           router.push("/account/orders");
         } catch (err) {
           console.error(err);

@@ -44,8 +44,9 @@ export default function ExpertProfilePage() {
   }
 
   return (
-    <main className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-sky-100 px-6 py-12">
-      <div className="mx-auto max-w-7xl">
+    <main className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-sky-100">
+      {/* subtle side padding only */}
+      <div className="mx-auto max-w-7xl px-6 pb-16">
         <HostProfileBanner expert={expert} />
       </div>
     </main>

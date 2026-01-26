@@ -8,6 +8,7 @@ type OrderRow = {
   amount: number;
   status: string;
   joinEnabled: boolean;
+  meetingLink?: string;
   actions?: React.ReactNode;
 };
 
@@ -69,8 +70,13 @@ export default function OrdersTable({
               </td>
 
               <td className="px-4 py-3">
-                {row.joinEnabled ? (
-                  <button className="cursor-pointer text-indigo-600 hover:underline">
+                {row.joinEnabled && row.meetingLink ? (
+                  <button
+                    onClick={() =>
+                      window.open(row.meetingLink, "_blank")
+                    }
+                    className="cursor-pointer text-indigo-600 hover:underline"
+                  >
                     Join
                   </button>
                 ) : (

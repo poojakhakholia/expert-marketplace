@@ -2,9 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import OrdersTable, {
-  OrderRow,
-} from "../../components/orders/OrdersTable";
+import OrdersTable, { OrderRow } from "../../components/orders/OrdersTable";
 
 type Booking = {
   id: string;
@@ -13,15 +11,21 @@ type Booking = {
   duration_minutes: number;
   amount: number;
   status: string;
+  meeting_link: string | null;
   users: {
     full_name: string | null;
   } | null;
 };
 
+function normalizeStatus(status: string) {
+  return status.trim().toLowerCase().replace(/\s+/g, "_");
+}
+
 export default function ExpertOrders() {
   const [upcoming, setUpcoming] = useState<OrderRow[]>([]);
   const [past, setPast] = useState<OrderRow[]>([]);
   const [loading, setLoading] = useState(true);
+  const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadOrders();
@@ -47,9 +51,8 @@ export default function ExpertOrders() {
         duration_minutes,
         amount,
         status,
-        users (
-          full_name
-        )
+        meeting_link,
+        users ( full_name )
       `
       )
       .eq("expert_id", session.user.id)
@@ -65,9 +68,34 @@ export default function ExpertOrders() {
     setLoading(false);
   }
 
+  async function acceptBooking(bookingId: string) {
+    try {
+      setAcceptingId(bookingId);
+
+      const res = await fetch("/api/bookings/accept", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ bookingId }),
+      });
+
+      const json = await res.json();
+
+      if (!res.ok) {
+        alert(json.error || "Failed to accept booking");
+        return;
+      }
+
+      await loadOrders();
+    } catch (err) {
+      console.error(err);
+      alert("Something went wrong");
+    } finally {
+      setAcceptingId(null);
+    }
+  }
+
   function splitBookings(bookings: Booking[]) {
     const now = new Date();
-
     const upcomingRows: OrderRow[] = [];
     const pastRows: OrderRow[] = [];
 
@@ -77,8 +105,11 @@ export default function ExpertOrders() {
         start.getTime() + b.duration_minutes * 60 * 1000
       );
 
+      const normalizedStatus = normalizeStatus(b.status);
+
       const joinEnabled =
-        b.status === "confirmed" &&
+        normalizedStatus === "confirmed" &&
+        !!b.meeting_link &&
         now >= new Date(start.getTime() - 5 * 60 * 1000) &&
         now <= end;
 
@@ -88,20 +119,29 @@ export default function ExpertOrders() {
         dateTime: start.toLocaleString(),
         duration: b.duration_minutes,
         amount: b.amount,
-        status: b.status,
+        status: normalizedStatus,
         joinEnabled,
+        meetingLink: b.meeting_link ?? undefined,
         actions:
-          b.status === "pending_confirmation" ? (
+          normalizedStatus === "pending_confirmation" ? (
             <div className="flex gap-2">
               <button
-                onClick={() => updateStatus(b.id, "confirmed")}
-                className="rounded-md bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 cursor-pointer"
+                disabled={acceptingId === b.id}
+                onClick={() => acceptBooking(b.id)}
+                className="rounded-md bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
               >
-                Accept
+                {acceptingId === b.id ? "Accepting…" : "Accept"}
               </button>
+
               <button
-                onClick={() => updateStatus(b.id, "rejected")}
-                className="rounded-md bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700 cursor-pointer"
+                onClick={async () => {
+                  await supabase
+                    .from("bookings")
+                    .update({ status: "cancelled" })
+                    .eq("id", b.id);
+                  loadOrders();
+                }}
+                className="rounded-md bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700"
               >
                 Reject
               </button>
@@ -119,23 +159,6 @@ export default function ExpertOrders() {
     setPast(pastRows);
   }
 
-  async function updateStatus(
-    bookingId: string,
-    status: "confirmed" | "rejected"
-  ) {
-    const { error } = await supabase
-      .from("bookings")
-      .update({ status })
-      .eq("id", bookingId);
-
-    if (error) {
-      alert("Failed to update status");
-      return;
-    }
-
-    loadOrders(); // refresh
-  }
-
   if (loading) {
     return (
       <div className="rounded-xl bg-white p-6 text-sm text-gray-500">
@@ -150,18 +173,12 @@ export default function ExpertOrders() {
 
       <section>
         <h2 className="mb-3 font-medium">Upcoming Sessions</h2>
-        <OrdersTable
-          rows={upcoming}
-          nameLabel="Customer"
-        />
+        <OrdersTable rows={upcoming} nameLabel="Customer" />
       </section>
 
       <section>
         <h2 className="mb-3 font-medium">Past Sessions</h2>
-        <OrdersTable
-          rows={past}
-          nameLabel="Customer"
-        />
+        <OrdersTable rows={past} nameLabel="Customer" />
       </section>
     </div>
   );

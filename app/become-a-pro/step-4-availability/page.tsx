@@ -197,9 +197,17 @@ export default function Step4Availability() {
     if (!user) return
 
     if (isEditMode) {
-      // 👉 WRITE TO DB (delete + insert)
       try {
         setSaving(true)
+
+        /* 🔹 FETCH PRICING (SOURCE OF TRUTH) */
+        const { data: pricing, error: pricingError } = await supabase
+          .from('expert_profiles')
+          .select('fee_15, fee_30, fee_45, fee_60')
+          .eq('user_id', user.id)
+          .single()
+
+        if (pricingError) throw pricingError
 
         const del = await supabase
           .from('expert_availability')
@@ -215,6 +223,16 @@ export default function Step4Availability() {
               day_of_week: DAY_TO_INDEX[day as (typeof DAYS)[number]],
               start_time: s.start,
               end_time: s.end,
+
+              allows_15: !!pricing.fee_15 !== null,
+              allows_30: !!pricing.fee_30 !== null,
+              allows_45: !!pricing.fee_45 !== null,
+              allows_60: !!pricing.fee_60 !== null,
+
+              price_15: pricing.fee_15,
+              price_30: pricing.fee_30,
+              price_45: pricing.fee_45,
+              price_60: pricing.fee_60,
             }))
         )
 
@@ -225,8 +243,7 @@ export default function Step4Availability() {
           if (ins.error) throw ins.error
         }
 
-        // Skip review in edit mode
-        router.push('/') // ← adjust if you want another landing
+        router.push('/')
       } catch (e) {
         console.error(e)
         setError('Failed to save availability.')

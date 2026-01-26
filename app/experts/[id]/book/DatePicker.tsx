@@ -6,14 +6,24 @@ type Props = {
   availability?: any[]
 }
 
+/**
+ * DB: Monday = 0 ... Sunday = 6
+ * JS: Sunday = 0 ... Saturday = 6
+ */
+function dbDayToJsDay(dbDay: number): number {
+  return (dbDay + 1) % 7
+}
+
 export default function DatePicker({
   selectedDate,
   onChange,
   availability = [],
 }: Props) {
-  // availability may be undefined on first render
+  // normalize DB days → JS days
   const availableDays = new Set(
-    availability.map((a: any) => Number(a.day_of_week))
+    availability.map((a: any) =>
+      dbDayToJsDay(Number(a.day_of_week))
+    )
   )
 
   const dates = Array.from({ length: 14 }).map((_, i) => {
