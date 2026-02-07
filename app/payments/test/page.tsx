@@ -53,11 +53,14 @@ export default function TestPaymentPage() {
 
     setProcessing(true);
 
-    // 1. Create Razorpay order
+    // 1. Create Razorpay order (✅ booking_id INCLUDED)
     const res = await fetch("/api/payments/create-order", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ amount }),
+      body: JSON.stringify({
+        amount,
+        booking_id: bookingId,
+      }),
     });
 
     if (!res.ok) {
@@ -78,7 +81,7 @@ export default function TestPaymentPage() {
       order_id: order.order_id,
 
       handler: async function (response: any) {
-        console.log("RAZORPAY RESPONSE:", response); // 🔥 optional, helps debugging
+        console.log("RAZORPAY RESPONSE:", response);
 
         try {
           // 3. Verify payment
@@ -89,7 +92,7 @@ export default function TestPaymentPage() {
               booking_id: bookingId,
               razorpay_payment_id: response.razorpay_payment_id,
               razorpay_order_id: response.razorpay_order_id,
-              razorpay_signature: response.razorpay_signature, // 🔥 FIX
+              razorpay_signature: response.razorpay_signature,
             }),
           });
 
@@ -99,7 +102,7 @@ export default function TestPaymentPage() {
             return;
           }
 
-          // 4. Redirect user after success
+          // 4. Redirect after success
           router.push("/account/orders");
         } catch (err) {
           console.error(err);

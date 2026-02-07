@@ -4,6 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
+/* 🔹 helper: generate order code */
+function generateOrderCode() {
+  const num = Math.floor(100000 + Math.random() * 900000)
+  return `A-${num}`
+}
+
 export default function BookingSummary({
   expert,
   date,
@@ -24,7 +30,6 @@ export default function BookingSummary({
       ? expert.fee_60
       : 0
 
-  // ✅ ready only when all selections exist
   const ready = Boolean(date && time && duration)
 
   const handleBook = async () => {
@@ -45,6 +50,10 @@ export default function BookingSummary({
       const bookingDate = date.toLocaleDateString('en-CA')
       const startTime = time
 
+      /* 🔹 booking extras */
+      const isFree = price === 0
+      const orderCode = generateOrderCode()
+
       const { data, error } = await supabase
         .from('bookings')
         .insert({
@@ -55,22 +64,27 @@ export default function BookingSummary({
           duration_minutes: Number(duration),
           amount: price,
           status: 'pending_confirmation',
+
+          /* ✅ order code is ALWAYS present */
+          order_code: orderCode,
+          payment_status: isFree ? 'confirmed' : 'pending',
         })
         .select('id')
         .single()
 
       if (error) {
         console.error('BOOKING INSERT ERROR:', error)
-  alert(error.message)
+        alert(error.message)
         return
       }
 
-      // ✅ free booking → skip payment
-      if (price === 0) {
+      /* ✅ free booking → skip payment */
+      if (isFree) {
         router.push('/account/orders')
         return
       }
 
+      /* paid flow unchanged */
       router.push(`/payments/test?booking_id=${data.id}`)
     } finally {
       setLoading(false)
@@ -83,7 +97,6 @@ export default function BookingSummary({
         Booking summary
       </h2>
 
-      {/* Context */}
       <p className="text-sm text-gray-600 mb-4">
         You’re booking a conversation with{' '}
         <span className="font-medium text-gray-900">
@@ -91,7 +104,6 @@ export default function BookingSummary({
         </span>.
       </p>
 
-      {/* Details — show ONLY when selected */}
       <div className="space-y-1.5 text-sm text-gray-600">
         {date && (
           <div>
@@ -113,7 +125,6 @@ export default function BookingSummary({
         )}
       </div>
 
-      {/* Price */}
       {ready && (
         <div className="mt-6 pt-4 border-t flex justify-between text-base font-semibold">
           <span>Total</span>
@@ -121,7 +132,6 @@ export default function BookingSummary({
         </div>
       )}
 
-      {/* CTA */}
       <button
         disabled={!ready || loading}
         onClick={handleBook}
@@ -141,7 +151,6 @@ export default function BookingSummary({
           : 'Make payment'}
       </button>
 
-      {/* Trust text */}
       {ready && (
         <p className="mt-4 text-xs text-gray-500 leading-relaxed">
           After booking, this request will appear in your Orders.

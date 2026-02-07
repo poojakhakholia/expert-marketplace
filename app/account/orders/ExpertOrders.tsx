@@ -2,34 +2,36 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import OrdersTable, { OrderRow } from "../../components/orders/OrdersTable";
+import OrdersTable from "../../components/orders/OrdersTable";
 
 type Booking = {
   id: string;
+  order_code: string;
+  created_at: string;
   booking_date: string;
   start_time: string;
   duration_minutes: number;
   amount: number;
   status: string;
-  meeting_link: string | null;
+  payment_status: string;
   users: {
     full_name: string | null;
   } | null;
 };
 
-function normalizeStatus(status: string) {
-  return status.trim().toLowerCase().replace(/\s+/g, "_");
-}
-
 export default function ExpertOrders() {
-  const [upcoming, setUpcoming] = useState<OrderRow[]>([]);
-  const [past, setPast] = useState<OrderRow[]>([]);
+  const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [acceptingId, setAcceptingId] = useState<string | null>(null);
 
   useEffect(() => {
     loadOrders();
   }, []);
+
+  function isFutureMeeting(b: Booking) {
+    const start = new Date(`${b.booking_date}T${b.start_time}`);
+    return start > new Date();
+  }
 
   async function loadOrders() {
     const {
@@ -41,122 +43,150 @@ export default function ExpertOrders() {
       return;
     }
 
+    // DB-owned expiry (safe to call multiple times)
+    await supabase.rpc("enforce_booking_expiry");
+
     const { data, error } = await supabase
       .from("bookings")
-      .select(
-        `
+      .select(`
         id,
+        order_code,
+        created_at,
         booking_date,
         start_time,
         duration_minutes,
         amount,
         status,
-        meeting_link,
+        payment_status,
         users ( full_name )
-      `
-      )
+      `)
       .eq("expert_id", session.user.id)
-      .order("booking_date", { ascending: true });
+      .eq("payment_status", "confirmed")
+      .order("created_at", { ascending: false });
 
-    if (error) {
+    if (error || !data) {
       console.error("Failed to load expert orders", error);
       setLoading(false);
       return;
     }
 
-    splitBookings(data ?? []);
-    setLoading(false);
-  }
+    const mappedRows = data.map((b: Booking) => {
+      const canAcceptReject =
+        b.payment_status === "confirmed" &&
+        b.status === "pending_confirmation" &&
+        isFutureMeeting(b);
 
-  async function acceptBooking(bookingId: string) {
-    try {
-      setAcceptingId(bookingId);
+      const canCancel =
+        b.payment_status === "confirmed" &&
+        b.status === "confirmed" &&
+        isFutureMeeting(b);
 
-      const res = await fetch("/api/bookings/accept", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bookingId }),
-      });
-
-      const json = await res.json();
-
-      if (!res.ok) {
-        alert(json.error || "Failed to accept booking");
-        return;
-      }
-
-      await loadOrders();
-    } catch (err) {
-      console.error(err);
-      alert("Something went wrong");
-    } finally {
-      setAcceptingId(null);
-    }
-  }
-
-  function splitBookings(bookings: Booking[]) {
-    const now = new Date();
-    const upcomingRows: OrderRow[] = [];
-    const pastRows: OrderRow[] = [];
-
-    bookings.forEach((b) => {
-      const start = new Date(`${b.booking_date}T${b.start_time}`);
-      const end = new Date(
-        start.getTime() + b.duration_minutes * 60 * 1000
-      );
-
-      const normalizedStatus = normalizeStatus(b.status);
-
-      const joinEnabled =
-        normalizedStatus === "confirmed" &&
-        !!b.meeting_link &&
-        now >= new Date(start.getTime() - 5 * 60 * 1000) &&
-        now <= end;
-
-      const row: OrderRow = {
+      return {
         id: b.id,
+        orderCode: b.order_code,
+        orderDate: b.created_at,
         name: b.users?.full_name ?? "Customer",
-        dateTime: start.toLocaleString(),
+        dateTime: `${b.booking_date}T${b.start_time}`,
         duration: b.duration_minutes,
         amount: b.amount,
-        status: normalizedStatus,
-        joinEnabled,
-        meetingLink: b.meeting_link ?? undefined,
-        actions:
-          normalizedStatus === "pending_confirmation" ? (
-            <div className="flex gap-2">
-              <button
-                disabled={acceptingId === b.id}
-                onClick={() => acceptBooking(b.id)}
-                className="rounded-md bg-blue-600 px-3 py-1 text-sm text-white hover:bg-blue-700 disabled:opacity-50"
-              >
-                {acceptingId === b.id ? "Accepting…" : "Accept"}
-              </button>
+        status: b.status,
 
-              <button
-                onClick={async () => {
-                  await supabase
-                    .from("bookings")
-                    .update({ status: "cancelled" })
-                    .eq("id", b.id);
-                  loadOrders();
-                }}
-                className="rounded-md bg-red-600 px-3 py-1 text-sm text-white hover:bg-red-700"
-              >
-                Reject
-              </button>
-            </div>
-          ) : (
-            "—"
-          ),
+        actions: canAcceptReject ? (
+          <div className="flex gap-2">
+            <button
+              disabled={acceptingId === b.id}
+              onClick={async () => {
+                try {
+                  setAcceptingId(b.id);
+
+                  const res = await fetch("/api/bookings/accept", {
+                    method: "POST",
+                    headers: {
+                      "Content-Type": "application/json",
+                    },
+                    body: JSON.stringify({ bookingId: b.id }),
+                  });
+
+                  if (!res.ok) {
+                    const json = await res.json();
+                    alert(json.error || "Failed to accept booking");
+                    return;
+                  }
+
+                  await loadOrders();
+                } finally {
+                  setAcceptingId(null);
+                }
+              }}
+              className="rounded-md bg-orange-500 px-3 py-1 text-sm text-white"
+            >
+              Accept
+            </button>
+
+            <button
+              onClick={async () => {
+                const confirmed = window.confirm(
+                  "Reject this booking request?"
+                );
+                if (!confirmed) return;
+
+                const res = await fetch("/api/bookings/host-reject", {
+                  method: "POST",
+                  headers: {
+                    "Content-Type": "application/json",
+                  },
+                  body: JSON.stringify({ bookingId: b.id }),
+                });
+
+                if (!res.ok) {
+                  const json = await res.json();
+                  alert(json.error || "Failed to reject booking");
+                  return;
+                }
+
+                loadOrders();
+              }}
+              className="rounded-md bg-red-600 px-3 py-1 text-sm text-white"
+            >
+              Reject
+            </button>
+          </div>
+        ) : canCancel ? (
+          <button
+            onClick={async () => {
+              const confirmed = window.confirm(
+                "Are you sure you want to cancel this booking?\n\nThe user will be refunded (excluding Razorpay fee)."
+              );
+              if (!confirmed) return;
+
+              const res = await fetch("/api/bookings/host-cancel", {
+                method: "POST",
+                headers: {
+                  "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ bookingId: b.id }),
+              });
+
+              if (!res.ok) {
+                const json = await res.json();
+                alert(json.error || "Failed to cancel booking");
+                return;
+              }
+
+              loadOrders();
+            }}
+            className="rounded-md bg-red-600 px-3 py-1 text-sm text-white"
+          >
+            Cancel
+          </button>
+        ) : (
+          "—"
+        ),
       };
-
-      if (start >= now) upcomingRows.push(row);
-      else pastRows.push(row);
     });
 
-    setUpcoming(upcomingRows);
-    setPast(pastRows);
+    setRows(mappedRows);
+    setLoading(false);
   }
 
   if (loading) {
@@ -168,18 +198,12 @@ export default function ExpertOrders() {
   }
 
   return (
-    <div className="space-y-8">
-      <h1 className="text-xl font-semibold">Incoming Requests</h1>
+    <div className="bg-white rounded-xl p-6">
+      <h1 className="text-xl font-semibold mb-6 text-gray-900">
+        Incoming Requests
+      </h1>
 
-      <section>
-        <h2 className="mb-3 font-medium">Upcoming Sessions</h2>
-        <OrdersTable rows={upcoming} nameLabel="Customer" />
-      </section>
-
-      <section>
-        <h2 className="mb-3 font-medium">Past Sessions</h2>
-        <OrdersTable rows={past} nameLabel="Customer" />
-      </section>
+      <OrdersTable rows={rows} nameLabel="Requestor" />
     </div>
   );
 }

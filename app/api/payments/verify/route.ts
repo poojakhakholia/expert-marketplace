@@ -8,12 +8,6 @@ const supabase = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 );
 
-/* 🔹 helper: generate order code ONLY after payment */
-function generateOrderCode() {
-  const num = Math.floor(100000 + Math.random() * 900000);
-  return `A-${num}`;
-}
-
 export async function POST(req: Request) {
   try {
     const body = await req.json();
@@ -63,15 +57,12 @@ export async function POST(req: Request) {
       );
     }
 
-    /* 3️⃣ PAYMENT VERIFIED — UPDATE DB (DO NOT GATE ON RETURNED ROWS) */
-    const order_code = generateOrderCode();
-
+    /* 3️⃣ PAYMENT VERIFIED — UPDATE BOOKING STATE ONLY */
     const { error } = await supabase
       .from("bookings")
       .update({
         payment_status: "confirmed",
         payment_id: razorpay_payment_id,
-        order_code,
       })
       .eq("id", booking_id);
 

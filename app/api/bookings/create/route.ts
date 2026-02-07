@@ -17,6 +17,7 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     const {
+      user_id,
       expert_id,
       booking_date,
       start_time,
@@ -25,11 +26,12 @@ export async function POST(req: Request) {
     } = body;
 
     if (
+      !user_id ||
       !expert_id ||
       !booking_date ||
       !start_time ||
       !duration_minutes ||
-      !amount
+      amount === undefined
     ) {
       return NextResponse.json(
         { error: "Missing required fields" },
@@ -40,17 +42,19 @@ export async function POST(req: Request) {
     // 1️⃣ generate order code
     let order_code = generateOrderCode();
 
-    // 2️⃣ insert booking
+    // 2️⃣ insert booking (PRE-PAYMENT, HIDDEN FROM EXPERT)
     const { data, error } = await supabase
       .from("bookings")
       .insert({
+        user_id,
         expert_id,
         booking_date,
         start_time,
         duration_minutes,
         amount,
-        status: "pending_confirmation",
         order_code,
+        payment_status: "pending",
+        status: "pending_confirmation",
       })
       .select("id, order_code")
       .single();
@@ -62,13 +66,15 @@ export async function POST(req: Request) {
       const retry = await supabase
         .from("bookings")
         .insert({
+          user_id,
           expert_id,
           booking_date,
           start_time,
           duration_minutes,
           amount,
-          status: "pending_confirmation",
           order_code,
+          payment_status: "pending",
+          status: "pending_confirmation",
         })
         .select("id, order_code")
         .single();

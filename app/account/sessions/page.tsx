@@ -9,9 +9,8 @@ import { supabase } from "@/lib/supabase";
 type BookingStatus =
   | "pending_confirmation"
   | "confirmed"
-  | "completed"
-  | "cancelled"
-  | "refunded";
+  | "rejected"
+  | "cancelled";
 
 interface Booking {
   id: string;
@@ -29,6 +28,12 @@ interface Booking {
   expert_profiles?: { full_name: string | null };
 }
 
+interface Review {
+  booking_id: string;
+  rating: number;
+  comment: string | null;
+}
+
 /* ---------------- Helpers ---------------- */
 
 const formatDate = (date: string) =>
@@ -44,21 +49,25 @@ const formatTime = (date: string, time: string) =>
     minute: "2-digit",
   });
 
-/**
- * JOIN BUTTON LOGIC (FINAL)
- * - Conversation remains Upcoming until meeting END time
- * - Join enabled 15 mins before start
- * - Join remains active until meeting END time
- */
-const getJoinState = (b: Booking) => {
-  if (b.status !== "confirmed") {
-    return { show: false };
-  }
+const getStartTime = (b: Booking) =>
+  new Date(`${b.booking_date}T${b.start_time}`);
 
-  const start = new Date(`${b.booking_date}T${b.start_time}`);
+const hasMeetingStarted = (b: Booking) =>
+  new Date() >= getStartTime(b);
+
+const hasMeetingEnded = (b: Booking) => {
+  const start = getStartTime(b);
   const end = new Date(
     start.getTime() + b.duration_minutes * 60 * 1000
   );
+  return new Date() >= end;
+};
+
+const getJoinState = (b: Booking) => {
+  if (b.status !== "confirmed") return { show: false };
+
+  const start = getStartTime(b);
+  const end = new Date(start.getTime() + b.duration_minutes * 60 * 1000);
   const joinOpen = new Date(start.getTime() - 15 * 60 * 1000);
   const now = new Date();
 
@@ -88,8 +97,11 @@ const getJoinState = (b: Booking) => {
 export default function MySessionsPage() {
   const [tab, setTab] = useState<"upcoming" | "past">("upcoming");
   const [bookings, setBookings] = useState<Booking[]>([]);
+  const [reviews, setReviews] = useState<Record<string, Review>>({});
   const [reviewingId, setReviewingId] = useState<string | null>(null);
-  const [submittedReviews, setSubmittedReviews] = useState<string[]>([]);
+  const [rating, setRating] = useState<number>(0);
+  const [comment, setComment] = useState<string>("");
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
 
   useEffect(() => {
     const load = async () => {
@@ -98,7 +110,12 @@ export default function MySessionsPage() {
       } = await supabase.auth.getSession();
       if (!session) return;
 
-      const { data } = await supabase
+      setCurrentUserId(session.user.id);
+
+      // 🔒 DB-owned expiry
+      await supabase.rpc("enforce_booking_expiry");
+
+      const { data: bookingsData } = await supabase
         .from("bookings")
         .select(
           `
@@ -112,36 +129,74 @@ export default function MySessionsPage() {
         )
         .order("booking_date", { ascending: true });
 
-      setBookings(data || []);
+      const { data: reviewsData } = await supabase
+        .from("reviews")
+        .select("booking_id,rating,comment")
+        .eq("user_id", session.user.id);
+
+      const reviewMap: Record<string, Review> = {};
+      reviewsData?.forEach((r) => {
+        reviewMap[r.booking_id] = r;
+      });
+
+      setBookings(bookingsData || []);
+      setReviews(reviewMap);
     };
 
     load();
   }, []);
 
-  const now = new Date();
+    /* ✅ NEW: reconcile no-show AFTER meeting end */
+  useEffect(() => {
+    bookings.forEach(async (b) => {
+      if (
+        b.status === "confirmed" &&
+        hasMeetingEnded(b) &&
+        !b.no_show_by
+      ) {
+        let noShow: string | null = null;
 
-  const upcoming = bookings.filter((b) => {
-    const start = new Date(`${b.booking_date}T${b.start_time}`);
-    const end = new Date(
-      start.getTime() + b.duration_minutes * 60 * 1000
+        if (!b.host_joined_at && !b.user_joined_at) noShow = "both";
+        else if (!b.host_joined_at) noShow = "host";
+        else if (!b.user_joined_at) noShow = "user";
+
+        if (noShow) {
+          await supabase
+            .from("bookings")
+            .update({ no_show_by: noShow })
+            .eq("id", b.id);
+        }
+      }
+    });
+  }, [bookings]);
+  
+  /* ---------------- Filters ---------------- */
+
+  const upcoming = bookings
+    .filter(
+      (b) =>
+        !hasMeetingEnded(b) &&
+        (b.status === "confirmed" ||
+          (b.status === "pending_confirmation" &&
+            !hasMeetingStarted(b)))
+    )
+    .sort(
+      (a, b) =>
+        getStartTime(b).getTime() - getStartTime(a).getTime()
     );
 
-    return (
-      now < end &&
-      !["cancelled", "refunded"].includes(b.status)
-    );
-  });
-
-  const past = bookings.filter((b) => {
-    const start = new Date(`${b.booking_date}T${b.start_time}`);
-    const end = new Date(
-      start.getTime() + b.duration_minutes * 60 * 1000
-    );
-
-    return now >= end || b.status === "completed";
-  });
+  const past = bookings.filter(
+    (b) =>
+      hasMeetingEnded(b) ||
+      b.status === "rejected" ||
+      b.status === "cancelled" ||
+      (b.status === "pending_confirmation" &&
+        hasMeetingStarted(b))
+  );
 
   const list = tab === "upcoming" ? upcoming : past;
+
+  /* ---------------- UI ---------------- */
 
   return (
     <div className="space-y-6">
@@ -156,25 +211,25 @@ export default function MySessionsPage() {
             className={`pb-2 ${
               tab === t
                 ? "border-b-2 border-orange-500 font-medium"
-                : "text-gray-500"
+                : "text-gray-500 hover:text-gray-700"
             }`}
           >
-            {t === "upcoming" ? "Upcoming" : "Past"}
+            {t === "upcoming" ? "Upcoming" : "Past / Inactive"}
           </button>
         ))}
       </div>
 
-      {/* Empty Upcoming */}
-      {list.length === 0 && tab === "upcoming" && (
+      {/* Empty Upcoming CTA */}
+      {tab === "upcoming" && upcoming.length === 0 && (
         <div className="text-center mt-20">
           <p className="text-gray-600">
             No upcoming conversations yet.
           </p>
           <Link
             href="/explore"
-            className="inline-block mt-4 bg-orange-500 text-white px-6 py-3 rounded-lg"
+            className="inline-block mt-4 bg-orange-500 hover:bg-orange-600 text-white px-6 py-3 rounded-lg"
           >
-            Book a call with experienced professionals
+            Explore experts on Intella
           </Link>
         </div>
       )}
@@ -182,16 +237,21 @@ export default function MySessionsPage() {
       {/* Cards */}
       <div className="space-y-4">
         {list.map((b) => {
+          const isRequestor = currentUserId === b.user_id;
+          const displayName = isRequestor
+            ? b.expert_profiles?.full_name
+            : b.users?.full_name;
+
           const join =
             tab === "upcoming" ? getJoinState(b) : { show: false };
 
-          let displayStatus: BookingStatus = b.status;
-          if (
+          const review = reviews[b.id];
+          const canReview =
             tab === "past" &&
-            b.status === "pending_confirmation"
-          ) {
-            displayStatus = "cancelled";
-          }
+            b.status === "confirmed" &&
+            hasMeetingEnded(b) &&
+            !review &&
+            isRequestor;
 
           return (
             <div
@@ -204,13 +264,11 @@ export default function MySessionsPage() {
                     {b.order_code}
                   </div>
                 )}
-                <StatusBadge status={displayStatus} />
+                <StatusBadge status={b.status} />
               </div>
 
               <div className="text-sm font-medium">
-                Conversation between{" "}
-                {b.expert_profiles?.full_name ?? "—"} &{" "}
-                {b.users?.full_name ?? "—"}
+                Your conversation with {displayName ?? "—"}
               </div>
 
               <div className="text-sm text-gray-600">
@@ -219,88 +277,142 @@ export default function MySessionsPage() {
                 {b.duration_minutes} mins
               </div>
 
-              {join.show && (
-                <>
-                  <button
-                    disabled={!join.enabled}
-                    onClick={() =>
-                      join.enabled &&
-                      window.open(b.meeting_link!, "_blank")
-                    }
-                    className={`px-4 py-2 rounded-lg text-sm ${
-                      join.enabled
-                        ? "bg-orange-500 text-white"
-                        : "bg-gray-100 text-gray-500 cursor-not-allowed"
-                    }`}
-                  >
-                    {join.label}
-                  </button>
-
-                  {!join.enabled && (
-                    <p className="text-xs text-gray-500">
-                      Join link will be activated 15 minutes before the
-                      call
-                    </p>
-                  )}
-                </>
-              )}
-
-              {tab === "past" &&
-                displayStatus === "completed" &&
-                !submittedReviews.includes(b.id) && (
-                  <button
-                    className="text-sm text-orange-600 hover:underline"
-                    onClick={() => setReviewingId(b.id)}
-                  >
-                    Leave review
-                  </button>
+              {/* Expert microcopy */}
+              {b.status === "pending_confirmation" &&
+                !isRequestor &&
+                tab === "upcoming" && (
+                  <p className="text-xs text-amber-600">
+                    Approve this conversation in Orders to generate
+                    the meeting link.
+                  </p>
                 )}
 
-              {submittedReviews.includes(b.id) && (
-                <span className="text-sm text-green-600">
-                  Review submitted
-                </span>
+              {join.show && (
+                <button
+                  disabled={!join.enabled}
+                  onClick={async () => {
+                    if (!join.enabled) return;
+
+                    await supabase
+                      .from("bookings")
+                      .update(
+                        isRequestor
+                          ? { user_joined_at: new Date().toISOString("sv-SE", { timeZone: "Asia/Kolkata" }) }
+                          : { host_joined_at: new Date().toISOString("sv-SE", { timeZone: "Asia/Kolkata" }) }
+                      )
+                      .eq("id", b.id);
+
+                    // ✅ allow DB write to finish before navigation
+                    setTimeout(() => {
+                      window.open(b.meeting_link!, "_blank");
+                    }, 300);
+                  }}
+                  className={`px-4 py-2 rounded-lg text-sm ${
+                    join.enabled
+                      ? "bg-orange-500 text-white"
+                      : "bg-gray-100 text-gray-500 cursor-not-allowed"
+                  }`}
+                >
+                  {join.label}
+                </button>
+              )}
+
+              {/* Review CTA */}
+              {canReview && (
+                <button
+                  onClick={() => {
+                    setReviewingId(b.id);
+                    setRating(0);
+                    setComment("");
+                  }}
+                  className="text-sm text-orange-600 hover:underline"
+                >
+                  ★ Leave a review
+                </button>
+              )}
+
+              {/* Review Display */}
+              {review && (
+                <div className="text-sm text-green-600">
+                  {"★".repeat(review.rating)}
+                  {"☆".repeat(5 - review.rating)} · Review submitted
+                </div>
+              )}
+
+              {/* Review Form */}
+              {reviewingId === b.id && (
+                <div className="mt-3 border-t pt-3 space-y-3">
+                  <div className="flex gap-1 text-xl">
+                    {[1, 2, 3, 4, 5].map((s) => (
+                      <button
+                        key={s}
+                        onClick={() => setRating(s)}
+                        className={
+                          s <= rating
+                            ? "text-orange-500"
+                            : "text-gray-300"
+                        }
+                      >
+                        ★
+                      </button>
+                    ))}
+                  </div>
+
+                  <textarea
+                    value={comment}
+                    onChange={(e) =>
+                      setComment(e.target.value)
+                    }
+                    placeholder="Share your experience (optional)"
+                    className="w-full border rounded-lg p-3 text-sm"
+                    rows={3}
+                  />
+
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => setReviewingId(null)}
+                      className="text-sm text-gray-500"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      disabled={rating === 0}
+                      onClick={async () => {
+                        const {
+                          data: { session },
+                        } =
+                          await supabase.auth.getSession();
+                        if (!session) return;
+
+                        await supabase.from("reviews").insert({
+                          booking_id: b.id,
+                          user_id: session.user.id,
+                          expert_id: b.expert_id,
+                          rating,
+                          comment,
+                        });
+
+                        setReviews((prev) => ({
+                          ...prev,
+                          [b.id]: {
+                            booking_id: b.id,
+                            rating,
+                            comment,
+                          },
+                        }));
+                        setReviewingId(null);
+                      }}
+                      className="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm disabled:opacity-50"
+                    >
+                      Submit review
+                    </button>
+                  </div>
+                </div>
               )}
             </div>
           );
         })}
       </div>
-
-      {/* Review Modal */}
-      {reviewingId && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50">
-          <div className="bg-white rounded-xl p-6 w-full max-w-md space-y-4">
-            <h3 className="text-lg font-semibold">Leave a review</h3>
-
-            <textarea
-              placeholder="Share your experience (optional)"
-              className="w-full border rounded-lg p-3 text-sm"
-              rows={4}
-            />
-
-            <div className="flex justify-end gap-3">
-              <button
-                className="text-sm text-gray-500"
-                onClick={() => setReviewingId(null)}
-              >
-                Cancel
-              </button>
-              <button
-                className="bg-orange-500 text-white px-4 py-2 rounded-lg text-sm"
-                onClick={() => {
-                  setSubmittedReviews((prev) => [
-                    ...prev,
-                    reviewingId,
-                  ]);
-                  setReviewingId(null);
-                }}
-              >
-                Submit review
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
@@ -320,27 +432,21 @@ function StatusBadge({ status }: { status: BookingStatus }) {
       label: "Confirmed",
       className: "bg-green-50 text-green-700",
     },
-    completed: {
-      label: "Completed",
-      className: "bg-green-50 text-green-700",
+    rejected: {
+      label: "Rejected",
+      className: "bg-red-50 text-red-700",
     },
     cancelled: {
       label: "Cancelled",
       className: "bg-red-50 text-red-700",
     },
-    refunded: {
-      label: "Refunded",
-      className: "bg-red-50 text-red-700",
-    },
   };
-
-  const config = map[status];
 
   return (
     <span
-      className={`text-xs px-3 py-1 rounded-full ${config.className}`}
+      className={`text-xs px-3 py-1 rounded-full ${map[status].className}`}
     >
-      {config.label}
+      {map[status].label}
     </span>
   );
 }

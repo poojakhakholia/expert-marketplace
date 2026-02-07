@@ -2,23 +2,25 @@
 
 import { useEffect, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import OrdersTable, { OrderRow } from "../../components/orders/OrdersTable";
+import OrdersTable from "../../components/orders/OrdersTable";
 
 type Booking = {
   id: string;
+  order_code: string;
+  created_at: string;
   booking_date: string;
   start_time: string;
   duration_minutes: number;
   amount: number;
   status: string;
+  payment_status: string;
   expert_profiles: {
     full_name: string | null;
   } | null;
 };
 
 export default function UserOrders() {
-  const [upcoming, setUpcoming] = useState<OrderRow[]>([]);
-  const [past, setPast] = useState<OrderRow[]>([]);
+  const [rows, setRows] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -35,21 +37,27 @@ export default function UserOrders() {
       return;
     }
 
+    // 🔒 Enforce auto-rejection of expired pending bookings
+    await supabase.rpc("enforce_booking_expiry");
+
     const { data, error } = await supabase
       .from("bookings")
       .select(`
         id,
+        order_code,
+        created_at,
         booking_date,
         start_time,
         duration_minutes,
         amount,
         status,
+        payment_status,
         expert_profiles (
           full_name
         )
       `)
       .eq("user_id", session.user.id)
-      .order("booking_date", { ascending: true });
+      .order("created_at", { ascending: false });
 
     if (error || !data) {
       console.error(error);
@@ -57,60 +65,78 @@ export default function UserOrders() {
       return;
     }
 
-    const now = new Date();
-    const upcomingRows: OrderRow[] = [];
-    const pastRows: OrderRow[] = [];
+    const mappedRows = data.map((b: Booking) => {
+      const conversationDateTime = `${b.booking_date}T${b.start_time}`;
 
-    data.forEach((b: Booking) => {
-      const start = new Date(`${b.booking_date}T${b.start_time}`);
-      const end = new Date(
-        start.getTime() + b.duration_minutes * 60 * 1000
-      );
+      const canCancel =
+        b.payment_status === "confirmed" &&
+        b.status === "pending_confirmation";
 
-      const joinEnabled =
-        b.status === "confirmed" &&
-        now >= new Date(start.getTime() - 5 * 60 * 1000) &&
-        now <= end;
-
-      const row: OrderRow = {
+      return {
         id: b.id,
-        name: b.expert_profiles?.full_name ?? "Expert",
-        dateTime: start.toLocaleString(),
+        orderCode: b.order_code,
+        orderDate: b.created_at,
+        name: b.expert_profiles?.full_name ?? "Host",
+        dateTime: conversationDateTime,
         duration: b.duration_minutes,
         amount: b.amount,
         status: b.status,
-        joinEnabled,
-      };
 
-      if (end >= now) {
-        upcomingRows.push(row);
-      } else {
-        pastRows.push(row);
-      }
+        actions: canCancel ? (
+          <button
+            onClick={() => handleCancel(b.id)}
+            className="text-red-600 hover:underline text-sm"
+          >
+            Cancel
+          </button>
+        ) : (
+          "—"
+        ),
+      };
     });
 
-    setUpcoming(upcomingRows);
-    setPast(pastRows);
+    setRows(mappedRows);
     setLoading(false);
+  }
+
+  async function handleCancel(bookingId: string) {
+    const confirmed = window.confirm(
+      "Are you sure you want to cancel this booking?\n\nYou can cancel only before the host accepts. Razorpay payment fee is non-refundable."
+    );
+
+    if (!confirmed) return;
+
+    const res = await fetch("/api/bookings/user-cancel", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ bookingId }),
+    });
+
+    if (!res.ok) {
+      const json = await res.json();
+      alert(json.error || "Unable to cancel booking.");
+      return;
+    }
+
+    // reload orders
+    load();
   }
 
   if (loading) {
     return (
       <div className="bg-white rounded-xl p-6 text-sm text-gray-500">
-        Loading sessions…
+        Loading orders…
       </div>
     );
   }
 
   return (
     <div className="bg-white rounded-xl p-6">
-      <h1 className="text-xl font-semibold mb-6">My Sessions</h1>
+      <h1 className="text-xl font-semibold mb-6 text-gray-900">
+        Orders Placed
+      </h1>
 
-      <h2 className="font-medium mb-3">Upcoming Sessions</h2>
-      <OrdersTable rows={upcoming} nameLabel="Expert" />
-
-      <h2 className="font-medium mt-8 mb-3">Past Sessions</h2>
-      <OrdersTable rows={past} nameLabel="Expert" />
+      <OrdersTable rows={rows} nameLabel="Host" />
     </div>
   );
 }

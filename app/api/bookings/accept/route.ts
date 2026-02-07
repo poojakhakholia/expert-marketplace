@@ -33,20 +33,26 @@ export async function POST(req: Request) {
       );
     }
 
-    // 2️⃣ Build start & end time (IST)
-    const startISO = `${booking.booking_date}T${booking.start_time}+05:30`;
-    const end = new Date(startISO);
-    end.setMinutes(end.getMinutes() + booking.duration_minutes);
+    // 2️⃣ Build session start & end time (IST-safe)
+    // booking_date = YYYY-MM-DD
+    // start_time = HH:mm:ss
+    const sessionStartIST = `${booking.booking_date}T${booking.start_time}+05:30`;
+    const sessionStart = new Date(sessionStartIST);
+
+    const sessionEnd = new Date(sessionStart);
+    sessionEnd.setMinutes(
+      sessionEnd.getMinutes() + booking.duration_minutes
+    );
 
     // 3️⃣ Create Google Meet
     const meetLink = await createGoogleMeetEvent({
       summary: "Intella Conversation",
       description: `Conversation with ${booking.buyer_name ?? "Guest"}`,
-      startISO,
-      endISO: end.toISOString(),
+      startISO: sessionStart.toISOString(), // UTC
+      endISO: sessionEnd.toISOString(),     // UTC
     });
 
-    // 4️⃣ Update booking
+    // 4️⃣ Update booking (SINGLE SOURCE OF TRUTH)
     const { error: updateError } = await supabase
       .from("bookings")
       .update({
@@ -54,8 +60,13 @@ export async function POST(req: Request) {
         host_accepted: true,
         meeting_link: meetLink,
         meeting_created_at: new Date().toISOString(),
+
+        // 🔒 Critical for withdrawals & disputes
+        session_start_at: sessionStart.toISOString(),
+        session_end_at: sessionEnd.toISOString(),
       })
-      .eq("id", bookingId);
+      .eq("id", bookingId)
+      .eq("status", "pending_confirmation"); // idempotency guard
 
     if (updateError) {
       throw updateError;

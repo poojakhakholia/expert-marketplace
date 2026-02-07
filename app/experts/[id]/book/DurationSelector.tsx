@@ -10,7 +10,7 @@ export default function DurationSelector({
     { min: 30, price: expert.fee_30 },
     { min: 45, price: expert.fee_45 },
     { min: 60, price: expert.fee_60 },
-  ].filter(o => o.price)
+  ].filter(o => o.price !== null && o.price !== undefined)
 
   return (
     <div className="bg-white rounded-2xl p-6 border border-gray-100">

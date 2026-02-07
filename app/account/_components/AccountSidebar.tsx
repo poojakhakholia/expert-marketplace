@@ -50,6 +50,13 @@ const IconLogout = () => (
   </svg>
 );
 
+/* 🔹 NEW: Earnings Icon */
+const IconEarnings = () => (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+    <path d="M3 17h18v2H3v-2zm2-2h3V9H5v6zm5 0h3V5h-3v10zm5 0h3V12h-3v3z" />
+  </svg>
+);
+
 /* ---------- Component ---------- */
 
 export default function AccountSidebar() {
@@ -140,8 +147,6 @@ export default function AccountSidebar() {
 
       <div className="space-y-1">
         {navItem("Profile", <IconUser />, "/account/profile")}
-
-        {/* 🔹 LABEL CHANGE ONLY */}
         {navItem("My Conversations", <IconInbox />, "/account/sessions")}
 
         {expertStatus === "none" && (
@@ -169,6 +174,11 @@ export default function AccountSidebar() {
               "Orders Received",
               <IconInbox />,
               "/account/orders/received"
+            )}
+            {navItem(
+              "Earnings",
+              <IconEarnings />,
+              "/account/earnings"
             )}
             <Divider />
             {navItem("Edit Host Profile", <IconEdit />, undefined, goToHostEdit)}
