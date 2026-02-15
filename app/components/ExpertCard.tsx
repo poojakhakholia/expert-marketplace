@@ -13,6 +13,8 @@ type Expert = {
   fee_15: number | null
   fee_30: number | null
   fee_60: number | null
+
+  profile_image_url?: string | null
 }
 
 export default function ExpertCard({ expert }: { expert: Expert }) {
@@ -20,11 +22,23 @@ export default function ExpertCard({ expert }: { expert: Expert }) {
     expert.fee_15 ?? expert.fee_30 ?? expert.fee_60 ?? null
 
   return (
-    <Link
-      href={`/experts/${expert.user_id}`}
-      className="block"
-    >
+    <Link href={`/experts/${expert.user_id}`} className="block">
       <div className="border rounded-xl p-5 bg-white shadow-sm hover:shadow-md transition cursor-pointer">
+
+        {/* ✅ RECTANGULAR AVATAR (CARD BANNER) */}
+        <div className="mb-4 aspect-video rounded-lg bg-slate-100 overflow-hidden relative">
+          {expert.profile_image_url ? (
+            <img
+              src={expert.profile_image_url}
+              alt={expert.full_name || 'Expert'}
+              className="absolute inset-0 h-full w-full object-cover object-center"
+            />
+          ) : (
+            <div className="absolute inset-0 flex items-center justify-center text-slate-500 font-semibold text-4xl">
+              {expert.full_name?.[0] ?? '?'}
+            </div>
+          )}
+        </div>
 
         {/* Name */}
         <h3 className="text-lg font-semibold">
@@ -64,7 +78,6 @@ export default function ExpertCard({ expert }: { expert: Expert }) {
             </div>
           )}
         </div>
-
       </div>
     </Link>
   )

@@ -17,6 +17,9 @@ type EarningsRow = {
   intella_fee: number;
   pg_fee: number;
 
+  withdrawable_status: string; // 🔴 DB SOURCE OF TRUTH
+
+  /* kept only for totals logic */
   status?: string;
   host_joined_at?: string | null;
   session_end_at?: string | null;
@@ -27,36 +30,6 @@ type EarningsRow = {
 
 const formatINR = (n: number) =>
   `₹${n.toLocaleString("en-IN")}`;
-
-const isExpertNoShow = (r: EarningsRow) =>
-  r.status === "confirmed" &&
-  !r.host_joined_at &&
-  !!r.session_end_at &&
-  new Date(r.session_end_at).getTime() < Date.now();
-
-const getWithdrawableStatus = (r: EarningsRow) => {
-  if (r.status === "cancelled" || r.status === "rejected") {
-    return "Not applicable";
-  }
-
-  if (isExpertNoShow(r)) {
-    return "Not applicable";
-  }
-
-  if (r.is_disputed) {
-    return "On hold";
-  }
-
-  if (!r.session_end_at) {
-    return "Not yet";
-  }
-
-  const sessionEnd = new Date(r.session_end_at).getTime();
-  const now = Date.now();
-  const coolingMs = 48 * 60 * 60 * 1000;
-
-  return now - sessionEnd >= coolingMs ? "Yes" : "Not yet";
-};
 
 /* ---------------- Page ---------------- */
 
@@ -73,7 +46,7 @@ export default function EarningsDetailsPage() {
 
       if (!session) return;
 
-      /* 1️⃣ Earnings view */
+      /* 1️⃣ Earnings view (DB-calculated truth) */
       const { data: earnings, error } = await supabase
         .from("expert_earnings_details")
         .select(`
@@ -84,7 +57,8 @@ export default function EarningsDetailsPage() {
           rejection_amount,
           no_show_amount,
           intella_fee,
-          pg_fee
+          pg_fee,
+          withdrawable_status
         `)
         .eq("expert_id", session.user.id)
         .order("order_code", { ascending: false });
@@ -95,7 +69,7 @@ export default function EarningsDetailsPage() {
         return;
       }
 
-      /* 2️⃣ Booking state + buyer fallback */
+      /* 2️⃣ Booking state (used only for totals / labels) */
       const { data: bookings } = await supabase
         .from("bookings")
         .select(`
@@ -121,7 +95,7 @@ export default function EarningsDetailsPage() {
         ])
       );
 
-      /* 3️⃣ Merge safely */
+      /* 3️⃣ Merge */
       const merged: EarningsRow[] = earnings.map((r) => {
         const b = bookingMap.get(r.order_code ?? "");
         return {
@@ -130,10 +104,7 @@ export default function EarningsDetailsPage() {
           host_joined_at: b?.host_joined_at,
           session_end_at: b?.session_end_at,
           is_disputed: b?.is_disputed,
-          buyer_name:
-            r.buyer_name ??
-            b?.buyer_name ??
-            "Buyer",
+          buyer_name: r.buyer_name ?? b?.buyer_name ?? "Buyer",
         };
       });
 
@@ -148,14 +119,17 @@ export default function EarningsDetailsPage() {
 
   const totals = rows.reduce(
     (acc, r) => {
-      const noShow = isExpertNoShow(r);
+      const isNoShow =
+        r.status === "confirmed" &&
+        !r.host_joined_at &&
+        !!r.session_end_at;
 
       acc.gross += r.gross_earning;
       acc.cancellation += r.cancellation_amount;
       acc.rejection += r.rejection_amount;
-      acc.noShow += noShow ? r.gross_earning : 0;
-      acc.intellaFee += noShow ? 0 : r.intella_fee;
-      acc.pgFee += noShow ? 0 : r.pg_fee;
+      acc.noShow += isNoShow ? r.gross_earning : 0;
+      acc.intellaFee += isNoShow ? 0 : r.intella_fee;
+      acc.pgFee += isNoShow ? 0 : r.pg_fee;
 
       return acc;
     },
@@ -225,14 +199,17 @@ export default function EarningsDetailsPage() {
 
           <tbody>
             {rows.map((r, i) => {
-              const noShow = isExpertNoShow(r);
+              const isNoShow =
+                r.status === "confirmed" &&
+                !r.host_joined_at &&
+                !!r.session_end_at;
 
               const rowExpenses =
                 r.cancellation_amount +
                 r.rejection_amount +
-                (noShow ? r.gross_earning : 0) +
-                (noShow ? 0 : r.intella_fee) +
-                (noShow ? 0 : r.pg_fee);
+                (isNoShow ? r.gross_earning : 0) +
+                (isNoShow ? 0 : r.intella_fee) +
+                (isNoShow ? 0 : r.pg_fee);
 
               return (
                 <tr key={i} className="border-t">
@@ -248,19 +225,19 @@ export default function EarningsDetailsPage() {
                     {formatINR(r.rejection_amount)}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {formatINR(noShow ? r.gross_earning : 0)}
+                    {formatINR(isNoShow ? r.gross_earning : 0)}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {formatINR(noShow ? 0 : r.intella_fee)}
+                    {formatINR(isNoShow ? 0 : r.intella_fee)}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {formatINR(noShow ? 0 : r.pg_fee)}
+                    {formatINR(isNoShow ? 0 : r.pg_fee)}
                   </td>
                   <td className="px-3 py-2 text-right font-medium">
                     {formatINR(rowExpenses)}
                   </td>
-                  <td className="px-3 py-2 text-center">
-                    {getWithdrawableStatus(r)}
+                  <td className="px-3 py-2 text-center capitalize">
+                    {r.withdrawable_status.replace("_", " ")}
                   </td>
                 </tr>
               );

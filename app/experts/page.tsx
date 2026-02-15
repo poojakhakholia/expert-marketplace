@@ -24,6 +24,7 @@ type Expert = {
 export default function ExpertProfilePage() {
   const { id } = useParams()
   const [expert, setExpert] = useState<Expert | null>(null)
+  const [notFound, setNotFound] = useState(false)
 
   useEffect(() => {
     if (id) fetchExpert()
@@ -32,11 +33,36 @@ export default function ExpertProfilePage() {
   async function fetchExpert() {
     const { data } = await supabase
       .from('expert_profiles')
-      .select('*')
+      .select(`
+        *,
+        users!inner(is_active)
+      `)
       .eq('user_id', id)
+      .eq('approval_status', 'approved')
+      .eq('users.is_active', true)
       .single()
 
+    if (!data) {
+      setNotFound(true)
+      return
+    }
+
     setExpert(data)
+  }
+
+  if (notFound) {
+    return (
+      <main className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-sky-100 flex items-center justify-center">
+        <div className="text-center">
+          <h1 className="text-2xl font-semibold text-slate-800">
+            404 – Expert not found
+          </h1>
+          <p className="mt-3 text-slate-600">
+            This profile is not available.
+          </p>
+        </div>
+      </main>
+    )
   }
 
   if (!expert) {
@@ -45,7 +71,6 @@ export default function ExpertProfilePage() {
 
   return (
     <main className="min-h-screen bg-gradient-to-b from-sky-50 via-white to-sky-100">
-      {/* subtle side padding only */}
       <div className="mx-auto max-w-7xl px-6 pb-16">
         <HostProfileBanner expert={expert} />
       </div>

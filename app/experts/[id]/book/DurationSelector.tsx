@@ -6,10 +6,26 @@ export default function DurationSelector({
   onSelect,
 }: any) {
   const options = [
-    { min: 15, price: expert.fee_15 },
-    { min: 30, price: expert.fee_30 },
-    { min: 45, price: expert.fee_45 },
-    { min: 60, price: expert.fee_60 },
+    {
+      min: 15,
+      price: expert.fee_15,
+      note: expert.conversation_note_15,
+    },
+    {
+      min: 30,
+      price: expert.fee_30,
+      note: expert.conversation_note_30,
+    },
+    {
+      min: 45,
+      price: expert.fee_45,
+      note: expert.conversation_note_45,
+    },
+    {
+      min: 60,
+      price: expert.fee_60,
+      note: expert.conversation_note_60,
+    },
   ].filter(o => o.price !== null && o.price !== undefined)
 
   return (
@@ -23,7 +39,7 @@ export default function DurationSelector({
               key={o.min}
               onClick={() => onSelect(o.min)}
               className={`
-                rounded-xl px-4 py-5 text-center transition-all border
+                rounded-xl px-4 py-5 text-center transition-all border text-left
                 ${
                   selected
                     ? `
@@ -56,6 +72,16 @@ export default function DurationSelector({
               >
                 ₹{o.price}
               </div>
+
+              {/* 🔹 Best-for hint (only when selected & available) */}
+              {selected && o.note && (
+                <div className="mt-2 text-xs text-gray-600 leading-relaxed">
+                  <span className="font-medium text-gray-700">
+                    Best for:
+                  </span>{' '}
+                  {o.note}
+                </div>
+              )}
             </button>
           )
         })}

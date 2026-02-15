@@ -55,16 +55,15 @@ export default function HeroSection() {
       {/* CONTENT */}
       <div className="relative z-10 mx-auto max-w-7xl px-6 pt-28 pb-16 text-center">
         <h1 className="text-[42px] md:text-[56px] font-semibold tracking-tight text-slate-900 leading-[1.15]">
-          Everyone knows something
+          Turn your real-world experience
           <br className="hidden md:block" />
           <span className="bg-gradient-to-r from-sky-600 to-blue-600 bg-clip-text text-transparent">
-            worth sharing
+            into meaningful conversations
           </span>
         </h1>
 
         <p className="mt-5 max-w-2xl mx-auto text-base md:text-lg text-slate-600">
-          Learn directly from people’s real-world experience through
-          one-to-one conversations.
+          Share your expertise and lived knowledge to help, support, and guide others through one-to-one conversations.
         </p>
 
         {/* CTAs */}

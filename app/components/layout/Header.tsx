@@ -2,11 +2,12 @@
 
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, usePathname } from 'next/navigation'
 import { supabase } from '../../../lib/supabase'
 
 export default function Header() {
   const router = useRouter()
+  const pathname = usePathname()
   const [mounted, setMounted] = useState(false)
   const [user, setUser] = useState<any>(null)
 
@@ -17,6 +18,31 @@ export default function Header() {
       const {
         data: { user },
       } = await supabase.auth.getUser()
+
+      if (!user) {
+        setUser(null)
+        return
+      }
+
+      // 🔹 If on login page, allow login flow to handle reactivation
+      if (pathname === '/login') {
+        setUser(user)
+        return
+      }
+
+      // ✅ Check activation status
+      const { data: dbUser } = await supabase
+        .from('users')
+        .select('is_active')
+        .eq('id', user.id)
+        .single()
+
+      if (dbUser && dbUser.is_active === false) {
+        await supabase.auth.signOut()
+        router.replace('/login')
+        return
+      }
+
       setUser(user)
     }
 
@@ -29,9 +55,8 @@ export default function Header() {
     })
 
     return () => subscription.unsubscribe()
-  }, [])
+  }, [router, pathname])
 
-  // Prevent hydration mismatch
   if (!mounted) return null
 
   return (
@@ -39,16 +64,17 @@ export default function Header() {
       <div className="mx-auto max-w-7xl px-6">
         <div className="flex h-16 items-center justify-between">
 
-          {/* Brand */}
-          <Link href="/" className="flex items-center">
+          <Link href="/" className="flex items-center gap-3">
             <img
               src="/branding/intella-logo.png"
               alt="Intella"
               className="h-9 w-auto"
             />
+             <span className="hidden sm:inline-block rounded-full bg-orange-100 px-2.5 py-0.5 text-xs font-medium text-orange-600">
+              Early Access
+             </span>
           </Link>
 
-          {/* Actions */}
           <div className="flex items-center gap-4">
             {user ? (
               <button

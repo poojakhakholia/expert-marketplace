@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { User, Camera } from 'lucide-react'
@@ -17,6 +17,8 @@ type Draft = {
   department?: string
   mobile_number?: string
   profile_image_url?: string | null
+  linkedin_url?: string
+  twitter_url?: string
 }
 
 /* ✅ USER-SCOPED DRAFT KEY */
@@ -32,6 +34,8 @@ export default function Step1BasicInfo() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement | null>(null)
 
   /* ---------- INIT ---------- */
   useEffect(() => {
@@ -66,7 +70,9 @@ export default function Step1BasicInfo() {
             designation,
             department,
             mobile_number,
-            profile_image_url
+            profile_image_url,
+            linkedin_url,
+            twitter_url
           `
           )
           .eq('user_id', userId)
@@ -125,6 +131,61 @@ export default function Step1BasicInfo() {
     return true
   }
 
+  const handleImageUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>
+  ) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    try {
+      setError(null) // clear old error
+      setUploading(true)
+
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+        if (!user) return
+
+        const fileExt = file.name.split('.').pop()
+        const filePath = `${user.id}-${Date.now()}.${fileExt}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('profile-images')
+          .upload(filePath, file, {
+            cacheControl: '3600',
+            upsert: true,
+          })
+
+        if (uploadError) {
+          console.error('Upload error:', uploadError)
+          throw uploadError
+        }
+
+        const { data } = supabase.storage
+          .from('profile-images')
+          .getPublicUrl(filePath)
+
+        const publicUrl = data.publicUrl
+
+        update('profile_image_url', publicUrl)
+
+        // If edit mode → persist immediately
+        if (isEditMode) {
+          await supabase
+            .from('expert_profiles')
+            .update({ profile_image_url: publicUrl })
+            .eq('user_id', user.id)
+        }
+      } catch (err) {
+        console.error(err)
+        setError('Image upload failed.')
+      } finally {
+        setUploading(false)
+      }
+    }
+
+
   /* ---------- Save & Continue ---------- */
   const handleNext = async () => {
     if (!validate()) return
@@ -152,6 +213,8 @@ export default function Step1BasicInfo() {
             department: draft.department,
             mobile_number: draft.mobile_number,
             profile_image_url: draft.profile_image_url,
+            linkedin_url: draft.linkedin_url,
+            twitter_url: draft.twitter_url,
           })
           .eq('user_id', user.id)
 
@@ -185,7 +248,7 @@ export default function Step1BasicInfo() {
     <div className="min-h-[calc(100vh-80px)] bg-[#F7FAFC] px-6 py-12">
       <div className="mx-auto max-w-xl rounded-3xl bg-white p-8 shadow-sm">
 
-        {/* Header */}
+      {/* Header */}
         <div className="mb-8 text-center">
           <h1 className="text-2xl font-semibold text-gray-900">
             Tell us about yourself
@@ -211,11 +274,27 @@ export default function Step1BasicInfo() {
             )}
           </div>
 
-          <button className="mt-3 flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50">
-            <Camera size={14} />
-            Upload profile photo
+          <button
+            type="button"
+            onClick={() => fileInputRef.current?.click()}
+            className="mt-3 flex items-center gap-2 rounded-full border px-4 py-1.5 text-sm text-gray-600 hover:bg-gray-50"
+          >
+            {uploading ? 'Uploading…' : (
+              <>
+              <Camera size={14} />
+              Upload profile photo
+              </>
+            )}
           </button>
 
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept="image/*"
+            onChange={handleImageUpload}
+            className="hidden"
+          />
+            
           <p className="mt-2 text-xs text-gray-400">
             A friendly photo helps people feel comfortable starting a conversation.
           </p>
@@ -289,7 +368,7 @@ export default function Step1BasicInfo() {
           <input
             value={draft.department || ''}
             onChange={e => update('department', e.target.value)}
-            placeholder="Department (optional)"
+            placeholder="Industry eg FMGC/ Software / Banking etc (optional)"
             className="w-full rounded-lg border px-4 py-3 text-sm"
           />
 
@@ -301,8 +380,24 @@ export default function Step1BasicInfo() {
           />
         </div>
 
-        {error && (
-          <p className="mt-4 text-sm text-red-600">{error}</p>
+        <div className="space-y-4 mt-6">
+        <input
+        value={draft.linkedin_url || ''}
+        onChange={e => update('linkedin_url', e.target.value)}
+        placeholder="LinkedIn profile URL (optional)"
+        className="w-full rounded-lg border px-4 py-3 text-sm"
+      />
+
+      <input
+      value={draft.twitter_url || ''}
+      onChange={e => update('twitter_url', e.target.value)}
+      placeholder="Twitter / X profile URL (optional)"
+      className="w-full rounded-lg border px-4 py-3 text-sm"
+      />
+      </div>
+
+     {error && (
+        <p className="mt-4 text-sm text-red-600">{error}</p>
         )}
 
         <div className="mt-8 flex justify-end">

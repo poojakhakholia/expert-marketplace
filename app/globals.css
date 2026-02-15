@@ -110,3 +110,8 @@ body {
   font-size: 0.875rem;
   outline: none;
 }
+
+/* Explore page density tuning */
+html{
+  font-size: 75%; /* 14px instead of 16px */
+}

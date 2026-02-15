@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { createGoogleMeetEvent } from "@/lib/googleCalendar";
+import { sendSessionAcceptedEmail } from "@/lib/email/sendSessionAccepted";
 
 const supabase = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
@@ -71,6 +72,9 @@ export async function POST(req: Request) {
     if (updateError) {
       throw updateError;
     }
+
+    /* 🔔 Send confirmation email to user */
+    await sendSessionAcceptedEmail(bookingId);
 
     return NextResponse.json({
       success: true,

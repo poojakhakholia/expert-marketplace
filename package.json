@@ -8,13 +8,15 @@
     "start": "next start -p 3000"
   },
   "dependencies": {
+    "@react-email/render": "^2.0.4",
     "@supabase/supabase-js": "^2.45.4",
     "googleapis": "^170.1.0",
     "lucide-react": "^0.562.0",
     "next": "^14.2.35",
     "razorpay": "^2.9.6",
     "react": "18.2.0",
-    "react-dom": "18.2.0"
+    "react-dom": "18.2.0",
+    "resend": "^6.9.2"
   },
   "devDependencies": {
     "@tailwindcss/cli": "^4.1.18",

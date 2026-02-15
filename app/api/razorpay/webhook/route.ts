@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
+import { sendSessionRequestEmail } from "@/lib/email/sendSessionRequest";
 
 export async function POST(req: NextRequest) {
   try {
@@ -24,19 +25,25 @@ export async function POST(req: NextRequest) {
 
     const occurredAt = new Date().toISOString();
 
-    /* 2️⃣ Handle PAYMENT FAILED */
+    /* 2️⃣ Handle PAYMENT FAILED / ABANDONED */
     if (event === "payment.failed") {
+      const isAbandoned =
+        payment.error_reason === "payment_cancelled";
+
       const { error } = await supabaseServer
         .from("bookings")
         .update({
-          payment_status: "failed",
+          payment_status: isAbandoned ? "abandoned" : "failed",
           status: "cancelled",
           cancelled_by: "system",
         })
         .eq("id", bookingId);
 
       if (error) {
-        console.error("❌ Failed to mark booking as payment_failed:", error);
+        console.error(
+          "❌ Failed to mark booking as payment_failed/abandoned:",
+          error
+        );
         return NextResponse.json(
           { error: "payment_failed_update_error" },
           { status: 500 }
@@ -149,6 +156,8 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
+    /* 🔔 Trigger expert notification email */
+    await sendSessionRequestEmail(bookingId);
 
     /* 9️⃣ Ledger rows */
     const ledgerRows = [

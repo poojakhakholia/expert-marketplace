@@ -199,6 +199,9 @@ export default function AccountSidebar() {
         )}
 
         <Divider />
+        {navItem("Settings", <IconUser />, "/account/settings")}
+        
+        <Divider />
         {navItem("Logout", <IconLogout />, undefined, logout)}
       </div>
     </aside>

@@ -18,40 +18,21 @@ function StarIcon() {
 
 /* ---------- Types ---------- */
 
-type Review = {
-  name: string
+export type Review = {
+  reviewer_name: string
   rating: number
-  text: string
+  comment: string
 }
 
+/* ---------- Props ---------- */
+
 type HostReviewsProps = {
-  reviews?: Review[]
+  reviews: Review[]
 }
 
 /* ---------- Component ---------- */
 
-export default function HostReviews({
-  reviews = [
-    {
-      name: 'John R.',
-      rating: 5,
-      text:
-        'Talking to Sarah helped me get clarity on a few things I was stuck with. The conversation felt very natural and encouraging.',
-    },
-    {
-      name: 'Priya M.',
-      rating: 5,
-      text:
-        'I really appreciated how thoughtfully she listened. It felt less like advice and more like a genuine conversation.',
-    },
-    {
-      name: 'Alex T.',
-      rating: 4,
-      text:
-        'Great conversation overall. Walked away with practical insights and a lot more confidence.',
-    },
-  ],
-}: HostReviewsProps) {
+export default function HostReviews({ reviews }: HostReviewsProps) {
   if (!reviews.length) return null
 
   return (
@@ -70,10 +51,9 @@ export default function HostReviews({
       <div className="space-y-6">
         {reviews.slice(0, 3).map((review, index) => (
           <div key={index} className="max-w-3xl">
-            {/* Reviewer meta */}
             <div className="mb-1 flex items-center gap-2">
               <span className="font-medium text-slate-900 text-[14px]">
-                {review.name}
+                {review.reviewer_name}
               </span>
 
               <span className="flex items-center gap-1">
@@ -87,18 +67,19 @@ export default function HostReviews({
               </span>
             </div>
 
-            {/* Review text */}
             <p className="text-[14px] leading-relaxed text-slate-700">
-              “{review.text}”
+              “{review.comment}”
             </p>
           </div>
         ))}
       </div>
 
       {/* Soft CTA */}
-      <button className="mt-6 text-[14px] font-medium text-[#F97316] hover:underline">
-        View all conversations →
-      </button>
+      {reviews.length > 3 && (
+        <button className="mt-6 text-[14px] font-medium text-[#F97316] hover:underline">
+          View all conversations →
+        </button>
+      )}
     </section>
   )
 }

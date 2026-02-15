@@ -30,23 +30,28 @@ const isValidUpi = (upi: string) => {
 /* ---------------- Page ---------------- */
 
 export default function EarningsPage() {
-  const [summary, setSummary] =
-    useState<EarningsSummary | null>(null);
+  const [summary, setSummary] = useState<EarningsSummary | null>(null);
   const [loading, setLoading] = useState(true);
+  const [expertId, setExpertId] = useState<string | null>(null);
 
-  const [showWithdrawModal, setShowWithdrawModal] =
-    useState(false);
-  const [withdrawAmount, setWithdrawAmount] =
-    useState(0);
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState(0);
   const [upiId, setUpiId] = useState("");
   const [upiError, setUpiError] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+
+  /* ---------------- Load earnings ---------------- */
 
   useEffect(() => {
     const load = async () => {
       const {
         data: { session },
       } = await supabase.auth.getSession();
-      if (!session) return;
+
+      if (!session) {
+        setLoading(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from("expert_earnings_summary")
@@ -59,27 +64,135 @@ export default function EarningsPage() {
           available_to_withdraw
         `)
         .eq("expert_id", session.user.id)
-        .single();
+        .maybeSingle();
 
       if (error) {
-        console.error(
-          "Failed to load earnings summary",
-          error
-        );
+        console.error("Failed to load earnings summary", error);
         setLoading(false);
         return;
       }
 
-      setSummary(data);
-      setWithdrawAmount(data.available_to_withdraw);
+      if (data) {
+        setSummary(data);
+        setWithdrawAmount(data.available_to_withdraw);
+      }
+
       setLoading(false);
     };
 
     load();
   }, []);
 
+  /* ---------------- Early states ---------------- */
+
+  if (loading) {
+    return (
+      <div className="text-sm text-gray-500">
+        Loading earnings…
+      </div>
+    );
+  }
+
+  if (!summary || summary.gross_earnings === 0) {
+    const profileLink = expertId
+      ? `${window.location.origin}/experts/${expertId}`
+      : "";
+
+    const shareText =
+      "I’m now available for 1-on-1 conversations on Intella. Book time with me here:";
+
+    const copyLink = async () => {
+      await navigator.clipboard.writeText(profileLink);
+      alert("Profile link copied!");
+    };
+
+    const share = async () => {
+      if (navigator.share) {
+        await navigator.share({
+          title: "Book a conversation with me on Intella",
+          text: shareText,
+          url: profileLink,
+        });
+      } else {
+        copyLink();
+      }
+    };
+
+    return (
+      <div className="max-w-xl rounded-xl border bg-white p-6 space-y-4">
+        <h1 className="text-xl font-semibold text-gray-900">
+          No conversations yet 💬
+        </h1>
+
+        <p className="text-sm text-gray-600">
+          Once someone books a conversation with you, your earnings will appear here.
+        </p>
+
+        <div className="rounded-lg bg-slate-50 p-4 text-sm text-gray-700">
+          Share your public profile to get started. People are more likely to book
+          when they know what you help with.
+        </div>
+
+        <div className="flex flex-col gap-2">
+          <button
+            onClick={share}
+            className="w-full rounded-lg bg-orange-600 px-4 py-3 text-sm font-medium text-white hover:bg-orange-700"
+          >
+            🔗 Share your profile
+          </button>
+
+          <button
+            onClick={copyLink}
+            className="w-full rounded-lg border px-4 py-2 text-sm text-gray-700 hover:bg-gray-50"
+          >
+            📋 Copy profile link
+          </button>
+        </div>
+
+        <div className="pt-2 text-xs text-gray-500">
+          Share on:
+          <div className="mt-2 flex flex-wrap gap-2">
+            <a
+              href={`https://www.linkedin.com/sharing/share-offsite/?url=${encodeURIComponent(
+                profileLink
+              )}`}
+              target="_blank"
+              className="rounded-full border px-3 py-1 text-xs hover:bg-gray-50"
+            >
+              LinkedIn
+            </a>
+            <a
+              href={`https://twitter.com/intent/tweet?text=${encodeURIComponent(
+                `${shareText} ${profileLink}`
+              )}`}
+              target="_blank"
+              className="rounded-full border px-3 py-1 text-xs hover:bg-gray-50"
+            >
+              X
+            </a>
+            <a
+              href={`https://wa.me/?text=${encodeURIComponent(
+                `${shareText} ${profileLink}`
+              )}`}
+              target="_blank"
+              className="rounded-full border px-3 py-1 text-xs hover:bg-gray-50"
+            >
+              WhatsApp
+            </a>
+            <span className="rounded-full border px-3 py-1 text-xs text-gray-400">
+              Instagram (bio)
+            </span>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+
   const canWithdraw =
     summary?.available_to_withdraw >= 1000;
+
+  /* ---------------- Handlers ---------------- */
 
   const handleUpiChange = (val: string) => {
     setUpiId(val);
@@ -87,6 +200,62 @@ export default function EarningsPage() {
       isValidUpi(val) ? "" : "Please enter a valid UPI ID"
     );
   };
+
+  const handleSubmitWithdrawal = async () => {
+    if (!summary) return;
+
+    if (!isValidUpi(upiId)) {
+      setUpiError("Please enter a valid UPI ID");
+      return;
+    }
+
+    if (withdrawAmount <= 0) {
+      alert("Invalid withdrawal amount");
+      return;
+    }
+
+    if (withdrawAmount > summary.available_to_withdraw) {
+      alert("Withdrawal amount exceeds available balance");
+      return;
+    }
+
+    setSubmitting(true);
+
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      alert("Session expired. Please login again.");
+      setSubmitting(false);
+      return;
+    }
+
+    const { error } = await supabase
+      .from("expert_withdrawals")
+      .insert({
+        expert_id: session.user.id,
+        expert_email: session.user.email,
+        amount: withdrawAmount,
+        upi_id: upiId,
+        status: "requested",
+      });
+
+    if (error) {
+      console.error("Withdrawal request failed", error);
+      alert(error.message);
+      setSubmitting(false);
+      return;
+    }
+
+    // Success
+    setShowWithdrawModal(false);
+    setSubmitting(false);
+
+    window.location.href = "/account/earnings/withdrawals";
+  };
+
+  /* ---------------- Render ---------------- */
 
   if (loading || !summary) {
     return (
@@ -122,7 +291,6 @@ export default function EarningsPage() {
           value={formatINR(summary.total_expenses)}
           icon="🧾"
           accent="bg-rose-50 border-rose-300"
-          tooltip="Includes cancellations, rejections, no-shows, payment gateway charges and Intella platform fee."
         />
 
         <KpiCard
@@ -137,7 +305,6 @@ export default function EarningsPage() {
           value={formatINR(summary.earning_not_matured)}
           icon="⏳"
           accent="bg-yellow-50 border-yellow-300"
-          tooltip="Earnings from confirmed sessions that are not yet withdrawable. These become available 48 hours after session end, provided there is no dispute."
         />
 
         <KpiCard
@@ -156,7 +323,7 @@ export default function EarningsPage() {
         />
       </div>
 
-      {/* Details CTAs */}
+      {/* Links */}
       <div className="flex flex-col items-end gap-2">
         <button
           onClick={() =>
@@ -196,8 +363,7 @@ export default function EarningsPage() {
         </button>
 
         <p className="mt-2 text-xs text-gray-500 text-center">
-          Withdrawals are enabled once your available balance
-          reaches ₹1,000.
+          Withdrawals are enabled once your available balance reaches ₹1,000.
         </p>
       </div>
 
@@ -220,9 +386,7 @@ export default function EarningsPage() {
                   max={summary.available_to_withdraw}
                   value={withdrawAmount}
                   onChange={(e) =>
-                    setWithdrawAmount(
-                      Number(e.target.value)
-                    )
+                    setWithdrawAmount(Number(e.target.value))
                   }
                   className="mt-1 w-full rounded-lg border px-3 py-2 text-sm"
                 />
@@ -253,30 +417,28 @@ export default function EarningsPage() {
 
             <div className="mt-6 flex justify-end gap-3">
               <button
-                onClick={() =>
-                  setShowWithdrawModal(false)
-                }
+                onClick={() => setShowWithdrawModal(false)}
                 className="rounded-lg px-4 py-2 text-sm text-gray-600 hover:bg-gray-100"
               >
                 Cancel
               </button>
               <button
-                disabled={!isValidUpi(upiId)}
+                onClick={handleSubmitWithdrawal}
+                disabled={submitting || !isValidUpi(upiId)}
                 className={`rounded-lg px-4 py-2 text-sm font-medium text-white
                   ${
-                    isValidUpi(upiId)
-                      ? "bg-orange-600 hover:bg-orange-700"
-                      : "bg-gray-300 cursor-not-allowed"
+                    submitting
+                      ? "bg-gray-400"
+                      : "bg-orange-600 hover:bg-orange-700"
                   }
                 `}
               >
-                Submit Request
+                {submitting ? "Submitting…" : "Submit Request"}
               </button>
             </div>
 
             <p className="mt-3 text-xs text-gray-500">
-              Withdrawals are processed manually within
-              2–3 business days.
+              Withdrawals are processed manually within 2–3 business days.
             </p>
           </div>
         </div>

@@ -9,11 +9,11 @@ import { supabase } from "@/lib/supabase";
 type WithdrawalRow = {
   id: string;
   amount: number;
-  upi_id: string | null;
-  reference_id: string | null;
-  status: "pending" | "processing" | "paid" | "rejected";
-  created_at: string;
-  paid_at: string | null;
+  upi_id: string;
+  admin_reference: string | null;
+  status: "requested" | "processing" | "processed" | "rejected" | "failed";
+  requested_at: string;
+  processed_at: string | null;
 };
 
 /* ---------------- Helpers ---------------- */
@@ -37,7 +37,10 @@ export default function WithdrawalHistoryPage() {
         data: { session },
       } = await supabase.auth.getSession();
 
-      if (!session) return;
+      if (!session) {
+        setLoading(false);
+        return;
+      }
 
       const { data, error } = await supabase
         .from("expert_withdrawals")
@@ -45,13 +48,13 @@ export default function WithdrawalHistoryPage() {
           id,
           amount,
           upi_id,
-          reference_id,
+          admin_reference,
           status,
-          created_at,
-          paid_at
+          requested_at,
+          processed_at
         `)
         .eq("expert_id", session.user.id)
-        .order("created_at", { ascending: false });
+        .order("requested_at", { ascending: false });
 
       if (error) {
         console.error("Failed to load withdrawals", error);
@@ -75,7 +78,7 @@ export default function WithdrawalHistoryPage() {
             Withdrawal History
           </h1>
           <p className="text-sm text-gray-500">
-            Track all your withdrawal requests and payments
+            Track all your withdrawal requests and payouts
           </p>
         </div>
 
@@ -95,7 +98,7 @@ export default function WithdrawalHistoryPage() {
               <th className="px-3 py-2 text-left">Requested On</th>
               <th className="px-3 py-2 text-right">Amount</th>
               <th className="px-3 py-2 text-left">UPI ID</th>
-              <th className="px-3 py-2 text-left">Reference ID</th>
+              <th className="px-3 py-2 text-left">Reference / Note</th>
               <th className="px-3 py-2 text-left">Status</th>
               <th className="px-3 py-2 text-left">Paid On</th>
             </tr>
@@ -127,7 +130,7 @@ export default function WithdrawalHistoryPage() {
             {rows.map((r) => (
               <tr key={r.id} className="border-t">
                 <td className="px-3 py-2">
-                  {formatDate(r.created_at)}
+                  {formatDate(r.requested_at)}
                 </td>
 
                 <td className="px-3 py-2 text-right font-medium">
@@ -135,11 +138,11 @@ export default function WithdrawalHistoryPage() {
                 </td>
 
                 <td className="px-3 py-2">
-                  {r.upi_id ?? "—"}
+                  {r.upi_id}
                 </td>
 
                 <td className="px-3 py-2">
-                  {r.reference_id ?? "—"}
+                  {r.admin_reference ?? "—"}
                 </td>
 
                 <td className="px-3 py-2">
@@ -147,7 +150,7 @@ export default function WithdrawalHistoryPage() {
                 </td>
 
                 <td className="px-3 py-2">
-                  {formatDate(r.paid_at)}
+                  {formatDate(r.processed_at)}
                 </td>
               </tr>
             ))}
@@ -165,18 +168,27 @@ function StatusPill({
 }: {
   status: WithdrawalRow["status"];
 }) {
-  const map = {
-    pending: "bg-yellow-100 text-yellow-700",
+  const map: Record<string, string> = {
+    requested: "bg-yellow-100 text-yellow-700",
     processing: "bg-blue-100 text-blue-700",
-    paid: "bg-emerald-100 text-emerald-700",
+    processed: "bg-emerald-100 text-emerald-700",
     rejected: "bg-red-100 text-red-700",
+    failed: "bg-gray-100 text-gray-600",
+  };
+
+  const labelMap: Record<string, string> = {
+    requested: "Requested",
+    processing: "Processing",
+    processed: "Paid",
+    rejected: "Rejected",
+    failed: "Failed",
   };
 
   return (
     <span
       className={`rounded-full px-2 py-0.5 text-xs font-medium ${map[status]}`}
     >
-      {status.charAt(0).toUpperCase() + status.slice(1)}
+      {labelMap[status]}
     </span>
   );
 }

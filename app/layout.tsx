@@ -8,8 +8,8 @@ const Header = dynamic(
 )
 
 export const metadata = {
-  title: 'Callwithpro',
-  description: 'Book 1-on-1 calls with trusted professionals',
+  title: 'Intella',
+  description: 'Book 1-on-1 calls to learn from peoples real world experience',
 }
 
 export default function RootLayout({
@@ -20,11 +20,18 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className="bg-white text-gray-900 antialiased"
         suppressHydrationWarning
+        className="min-h-screen flex flex-col"
       >
+        {/* Header stays at top */}
         <Header />
-        {children}
+
+        {/* Main content grows to push footer down */}
+        <main className="flex-1">
+          {children}
+        </main>
+
+        {/* Footer stays at bottom */}
         <Footer />
       </body>
     </html>

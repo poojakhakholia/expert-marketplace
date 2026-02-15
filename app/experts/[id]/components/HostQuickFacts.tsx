@@ -2,12 +2,16 @@
 
 /* ---------- Inline Icons (Intella orange) ---------- */
 
-function BriefcaseIcon() {
-  return <span className="text-[16px] text-[#F97316]">🧑‍💼</span>
+function IndustryIcon() {
+  return <span className="text-[16px] text-[#F97316]">🏭</span>
 }
 
 function BuildingIcon() {
   return <span className="text-[16px] text-[#F97316]">🏢</span>
+}
+
+function BriefcaseIcon() {
+  return <span className="text-[16px] text-[#F97316]">🧑‍💼</span>
 }
 
 function CalendarIcon() {
@@ -25,8 +29,9 @@ function LocationIcon() {
 /* ---------- Types ---------- */
 
 type HostQuickFactsProps = {
-  designation?: string
+  department?: string // Industry
   company?: string
+  designation?: string
   experience_years?: number
   conversations_count?: number
   city?: string
@@ -36,8 +41,9 @@ type HostQuickFactsProps = {
 /* ---------- Component ---------- */
 
 export default function HostQuickFacts({
-  designation,
+  department,
   company,
+  designation,
   experience_years,
   conversations_count,
   city,
@@ -52,11 +58,11 @@ export default function HostQuickFacts({
 
       {/* Facts */}
       <ul className="space-y-3 text-[14px]">
-        {designation && (
+        {department && (
           <Fact
-            icon={<BriefcaseIcon />}
-            label="Role"
-            value={designation}
+            icon={<IndustryIcon />}
+            label="Industry"
+            value={department}
           />
         )}
 
@@ -65,6 +71,14 @@ export default function HostQuickFacts({
             icon={<BuildingIcon />}
             label="Company"
             value={company}
+          />
+        )}
+
+        {designation && (
+          <Fact
+            icon={<BriefcaseIcon />}
+            label="Designation"
+            value={designation}
           />
         )}
 

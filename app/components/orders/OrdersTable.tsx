@@ -1,96 +1,165 @@
-  "use client";
+"use client";
 
-  type OrderRow = {
-    id: string; // internal row key
+type OrderRow = {
+  id: string; // internal row key
 
-    // from Supabase (ISO strings expected)
-    orderCode?: string;
-    orderDate?: string; // order created_at
-    dateTime: string; // conversation datetime
+  // from Supabase (ISO strings expected)
+  orderCode?: string;
+  orderDate?: string; // order created_at
+  dateTime: string; // conversation datetime
 
-    name: string; // requestor / host name
-    duration: number;
-    amount: number;
-    status: string;
+  name: string; // requestor / host name
+  duration: number;
+  amount: number;
 
-    // backward compatibility (unused)
-    joinEnabled?: boolean;
-    meetingLink?: string;
+  status: string; // booking.status
+  paymentStatus?: string; // 🔹 NEW (optional, backward-safe)
 
-    actions?: React.ReactNode;
-  };
+  // backward compatibility (unused)
+  joinEnabled?: boolean;
+  meetingLink?: string;
 
-  function formatDateTime(value?: string) {
-    if (!value) return "—";
-    const date = new Date(value);
-    if (isNaN(date.getTime())) return "—";
+  actions?: React.ReactNode;
+};
 
-    const datePart = date.toLocaleDateString("en-IN", {
-      day: "2-digit",
-      month: "short",
-      year: "numeric",
-    });
+function formatDateTime(value?: string) {
+  if (!value) return "—";
+  const date = new Date(value);
+  if (isNaN(date.getTime())) return "—";
 
-    const timePart = date
-      .toLocaleTimeString("en-IN", {
-        hour: "2-digit",
-        minute: "2-digit",
-        hour12: true,
-      })
-      .toLowerCase();
+  const datePart = date.toLocaleDateString("en-IN", {
+    day: "2-digit",
+    month: "short",
+    year: "numeric",
+  });
 
-    return `${datePart}, IST ${timePart}`;
+  const timePart = date
+    .toLocaleTimeString("en-IN", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    })
+    .toLowerCase();
+
+  return `${datePart}, IST ${timePart}`;
+}
+
+/* ---------------- Status Badge Logic ---------------- */
+
+function getStatusBadge(
+  status: string,
+  paymentStatus?: string
+) {
+  // Confirmed booking
+  if (status === "confirmed") {
+    return {
+      label: "Confirmed",
+      className: "bg-green-100 text-green-700",
+    };
   }
 
-  export default function OrdersTable({
-    rows,
-    nameLabel,
-  }: {
-    rows: OrderRow[];
-    nameLabel: string;
-  }) {
-    if (rows.length === 0) {
-      return (
-        <div className="rounded-lg border bg-white p-6 text-sm text-gray-500">
-          No orders found
-        </div>
-      );
+  // Awaiting host
+  if (status === "pending_confirmation") {
+    return {
+      label: "Awaiting confirmation",
+      className: "bg-yellow-100 text-yellow-800",
+    };
+  }
+
+  // Cancelled cases
+  if (status === "cancelled") {
+    if (paymentStatus === "abandoned") {
+      return {
+        label: "Payment abandoned",
+        className: "bg-gray-100 text-gray-600",
+      };
     }
 
-    return (
-      <div className="overflow-hidden rounded-lg border bg-white">
-        <table className="w-full text-sm">
-          <thead className="bg-orange-50">
-            <tr className="text-gray-700">
-              <th className="px-4 py-3 text-left font-medium">
-                Order ID
-              </th>
-              <th className="px-4 py-3 text-left font-medium">
-                Order Time
-              </th>
-              <th className="px-4 py-3 text-left font-medium">
-                {nameLabel}
-              </th>
-              <th className="px-4 py-3 text-left font-medium">
-                Conversation Date & Time
-              </th>
-              <th className="px-4 py-3 text-left font-medium">
-                Duration
-              </th>
-              <th className="px-4 py-3 text-left font-medium">
-                Amount
-              </th>
-              <th className="px-4 py-3 text-left font-medium">
-                Order Status
-              </th>
-              <th className="px-4 py-3 text-left font-medium">
-                Action
-              </th>
-            </tr>
-          </thead>
+    if (paymentStatus === "failed") {
+      return {
+        label: "Payment failed",
+        className: "bg-red-100 text-red-700",
+      };
+    }
 
-          <tbody>
-            {rows.map((row) => (
+    return {
+      label: "Cancelled",
+      className: "bg-gray-100 text-gray-600",
+    };
+  }
+
+  // Rejected by host
+  if (status === "rejected") {
+    return {
+      label: "Rejected",
+      className: "bg-red-100 text-red-700",
+    };
+  }
+
+  // Fallback
+  return {
+    label: status.replaceAll("_", " "),
+    className: "bg-gray-100 text-gray-600",
+  };
+}
+
+/* ---------------- Component ---------------- */
+
+export default function OrdersTable({
+  rows,
+  nameLabel,
+}: {
+  rows: OrderRow[];
+  nameLabel: string;
+}) {
+  if (rows.length === 0) {
+    return (
+      <div className="rounded-lg border bg-white p-6 text-sm text-gray-500">
+        No orders found
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-lg border bg-white">
+      <table className="w-full text-sm">
+        <thead className="bg-orange-50">
+          <tr className="text-gray-700">
+            <th className="px-4 py-3 text-left font-medium">
+              Order ID
+            </th>
+            <th className="px-4 py-3 text-left font-medium">
+              Order Time
+            </th>
+            <th className="px-4 py-3 text-left font-medium">
+              {nameLabel}
+            </th>
+            <th className="px-4 py-3 text-left font-medium">
+              Conversation Date & Time
+            </th>
+            <th className="px-4 py-3 text-left font-medium">
+              Duration
+            </th>
+            <th className="px-4 py-3 text-left font-medium">
+              Amount
+            </th>
+            <th className="px-4 py-3 text-left font-medium">
+              Order Status
+            </th>
+            <th className="px-4 py-3 text-left font-medium">
+              Action
+            </th>
+          </tr>
+        </thead>
+
+        <tbody>
+          {rows.map((row) => {
+            const badge = getStatusBadge(
+              row.status,
+              row.paymentStatus
+            );
+
+            return (
               <tr
                 key={row.id}
                 className="border-t transition hover:bg-gray-50"
@@ -121,17 +190,9 @@
 
                 <td className="px-4 py-3">
                   <span
-                    className={`rounded-full px-3 py-1 text-xs font-medium ${
-                      row.status === "confirmed"
-                        ? "bg-green-100 text-green-700"
-                        : row.status === "pending_confirmation"
-                        ? "bg-yellow-100 text-yellow-800"
-                        : row.status === "rejected"
-                        ? "bg-red-100 text-red-700"
-                        : "bg-gray-100 text-gray-600"
-                    }`}
+                    className={`rounded-full px-3 py-1 text-xs font-medium ${badge.className}`}
                   >
-                    {row.status.replaceAll("_", " ")}
+                    {badge.label}
                   </span>
                 </td>
 
@@ -139,9 +200,10 @@
                   {row.actions ?? "—"}
                 </td>
               </tr>
-            ))}
-          </tbody>
-        </table>
-      </div>
-    );
-  }
+            );
+          })}
+        </tbody>
+      </table>
+    </div>
+  );
+}

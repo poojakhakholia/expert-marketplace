@@ -32,8 +32,16 @@ export default function Footer() {
                   About
                 </Link>
               </li>
+
+              {/* ✅ NEW PRICING LINK ADDED */}
               <li>
-                <Link href="/contact" className="hover:text-slate-800">
+                <Link href="/pricing" className="hover:text-slate-800">
+                  Pricing
+                </Link>
+              </li>
+
+              <li>
+                <Link href="/about#contact" className="hover:text-slate-800">
                   Contact
                 </Link>
               </li>
@@ -62,7 +70,7 @@ export default function Footer() {
             <ul className="mt-4 space-y-2 text-sm text-slate-600">
               <li>
                 <Link href="/terms" className="hover:text-slate-800">
-                  Terms
+                  Terms Of Service
                 </Link>
               </li>
               <li>

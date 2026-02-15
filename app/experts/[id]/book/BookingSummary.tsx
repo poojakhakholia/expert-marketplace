@@ -4,17 +4,12 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-/* 🔹 helper: generate order code */
-function generateOrderCode() {
-  const num = Math.floor(100000 + Math.random() * 900000)
-  return `A-${num}`
-}
-
 export default function BookingSummary({
   expert,
   date,
   time,
   duration,
+  isSelfBooking = false, // 🔒 existing safeguard
 }: any) {
   const router = useRouter()
   const [loading, setLoading] = useState(false)
@@ -32,12 +27,13 @@ export default function BookingSummary({
 
   const ready = Boolean(date && time && duration)
 
-  const handleBook = async () => {
+  const handleProceed = async () => {
+    if (isSelfBooking) return
     if (!ready || loading) return
 
-    try {
-      setLoading(true)
+    setLoading(true)
 
+    try {
       const {
         data: { user },
       } = await supabase.auth.getUser()
@@ -47,49 +43,27 @@ export default function BookingSummary({
         return
       }
 
+      // 🔑 IMPORTANT:
+      // No booking, no order_code, no DB write here.
+      // This is only an INTENT handoff to payment page.
+
       const bookingDate = date.toLocaleDateString('en-CA')
-      const startTime = time
 
-      /* 🔹 booking extras */
-      const isFree = price === 0
-      const orderCode = generateOrderCode()
+      const params = new URLSearchParams({
+        expert_id: expert.user_id,
+        date: bookingDate,
+        time,
+        duration: String(duration),
+      })
 
-      const { data, error } = await supabase
-        .from('bookings')
-        .insert({
-          user_id: user.id,
-          expert_id: expert.user_id,
-          booking_date: bookingDate,
-          start_time: startTime,
-          duration_minutes: Number(duration),
-          amount: price,
-          status: 'pending_confirmation',
-
-          /* ✅ order code is ALWAYS present */
-          order_code: orderCode,
-          payment_status: isFree ? 'confirmed' : 'pending',
-        })
-        .select('id')
-        .single()
-
-      if (error) {
-        console.error('BOOKING INSERT ERROR:', error)
-        alert(error.message)
-        return
-      }
-
-      /* ✅ free booking → skip payment */
-      if (isFree) {
-        router.push('/account/orders')
-        return
-      }
-
-      /* paid flow unchanged */
-      router.push(`/payments/test?booking_id=${data.id}`)
+      router.push(`/payments/test?${params.toString()}`)
     } finally {
       setLoading(false)
     }
   }
+
+  const isDisabled =
+    isSelfBooking || !ready || loading
 
   return (
     <aside className="bg-white rounded-2xl p-6 shadow-sm sticky top-10 h-fit">
@@ -132,30 +106,42 @@ export default function BookingSummary({
         </div>
       )}
 
+      {/* CTA */}
       <button
-        disabled={!ready || loading}
-        onClick={handleBook}
+        disabled={isDisabled}
+        onClick={handleProceed}
+        title={
+          isSelfBooking
+            ? 'You cannot book yourself'
+            : undefined
+        }
         className={`
           mt-6 w-full rounded-xl py-3 text-sm font-semibold transition
           ${
-            ready && !loading
+            !isDisabled
               ? 'bg-gradient-to-r from-orange-500 to-orange-600 text-white hover:from-orange-600 hover:to-orange-700 shadow-md'
               : 'bg-gray-200 text-gray-500 cursor-not-allowed'
           }
         `}
       >
-        {loading
+        {isSelfBooking
+          ? 'Booking unavailable'
+          : loading
           ? 'Processing…'
-          : price === 0 && ready
-          ? 'Book conversation (free)'
-          : 'Make payment'}
+          : price === 0
+          ? 'Proceed (Free session)'
+          : 'Proceed to payment'}
       </button>
 
-      {ready && (
+      {isSelfBooking && (
+        <p className="mt-3 text-xs text-gray-500 text-center">
+          You cannot book a conversation with yourself.
+        </p>
+      )}
+
+      {ready && !isSelfBooking && (
         <p className="mt-4 text-xs text-gray-500 leading-relaxed">
-          After booking, this request will appear in your Orders.
-          The join link will be activated a few minutes before the
-          conversation starts.
+          You’ll review and confirm this booking on the next step.
         </p>
       )}
     </aside>

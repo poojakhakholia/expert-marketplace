@@ -10,7 +10,6 @@ import DatePicker from './DatePicker'
 import TimeSlots from './TimeSlots'
 import DurationSelector from './DurationSelector'
 import BookingSummary from './BookingSummary'
-import { generateSlots } from '@/lib/generateSlots'
 
 import { CalendarDays, Clock, Timer } from 'lucide-react'
 
@@ -21,11 +20,27 @@ import { CalendarDays, Clock, Timer } from 'lucide-react'
 /**
  * DB: Monday = 0 ... Sunday = 6
  * JS: Sunday = 0 ... Saturday = 6
- *
- * Convert DB day → JS day
  */
 function dbDayToJsDay(dbDay: number): number {
   return (dbDay + 1) % 7
+}
+
+/**
+ * Convert JS Date → IST YYYY-MM-DD
+ */
+function formatDateIST(d: Date): string {
+  return d.toLocaleDateString('en-CA', {
+    timeZone: 'Asia/Kolkata',
+  })
+}
+
+/* ----------------------------------------
+   Types
+---------------------------------------- */
+
+type Slot = {
+  time: string
+  status: 'available' | 'booked' | 'too_soon'
 }
 
 /* ----------------------------------------
@@ -37,19 +52,33 @@ export default function ExpertBookingPage() {
 
   const [expert, setExpert] = useState<any>(null)
   const [availability, setAvailability] = useState<any[]>([])
-  const [bookings, setBookings] = useState<any[]>([])
 
   const [selectedDate, setSelectedDate] = useState<Date | null>(null)
   const [duration, setDuration] = useState<number | null>(null)
   const [selectedTime, setSelectedTime] = useState<string | null>(null)
+
+  const [slots, setSlots] = useState<Slot[]>([])
+
   const [loading, setLoading] = useState(true)
+  const [loadingSlots, setLoadingSlots] = useState(false)
+
+  /* 🔒 NEW: self-booking guard */
+  const [isSelfBooking, setIsSelfBooking] = useState(false)
 
   /* ----------------------------------------
-     Load expert + availability
+     Load expert + availability + auth check
   ---------------------------------------- */
 
   useEffect(() => {
     async function loadExpert() {
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
+
+      if (user && user.id === id) {
+        setIsSelfBooking(true)
+      }
+
       const { data: expert } = await supabase
         .from('expert_profiles')
         .select('*')
@@ -90,28 +119,50 @@ export default function ExpertBookingPage() {
   }, [id])
 
   /* ----------------------------------------
-     Load bookings for selected date
+     Load available slots
   ---------------------------------------- */
 
   useEffect(() => {
-    if (!selectedDate) return
+    async function loadSlots() {
+      if (!selectedDate || !duration) {
+        setSlots([])
+        return
+      }
 
-    async function loadBookings() {
-      const dateStr = selectedDate.toISOString().split('T')[0]
+      setLoadingSlots(true)
+      setSelectedTime(null)
 
-      const { data } = await supabase
-        .from('bookings')
-        .select('start_time,end_time')
-        .eq('expert_id', id)
-        .eq('booking_date', dateStr)
-        .in('status', ['pending', 'confirmed'])
+      const bookingDate = formatDateIST(selectedDate)
 
-      setBookings(data || [])
+      const { data, error } = await supabase.rpc(
+        'get_available_slots',
+        {
+          p_expert_id: id,
+          p_booking_date: bookingDate,
+          p_duration: duration,
+        }
+      )
+
+      if (error) {
+        console.error('Failed to load available slots', error)
+        setSlots([])
+        setLoadingSlots(false)
+        return
+      }
+
+      const formatted: Slot[] = (data || []).map(
+        (r: { start_time: string; status: string }) => ({
+          time: r.start_time.slice(0, 5),
+          status: r.status,
+        })
+      )
+
+      setSlots(formatted)
+      setLoadingSlots(false)
     }
 
-    loadBookings()
-    setSelectedTime(null)
-  }, [id, selectedDate])
+    loadSlots()
+  }, [id, selectedDate, duration])
 
   if (loading) {
     return (
@@ -120,35 +171,6 @@ export default function ExpertBookingPage() {
       </main>
     )
   }
-
-  /* ----------------------------------------
-     Availability for selected day
-  ---------------------------------------- */
-
-  const selectedDay =
-    selectedDate !== null ? selectedDate.getDay() : null
-
-  const dayAvailability =
-    selectedDay === null
-      ? []
-      : availability.filter(a => {
-          const jsDay = dbDayToJsDay(a.day_of_week)
-          return jsDay === selectedDay
-        })
-
-  /* ----------------------------------------
-     Slot generation (NO premature filtering)
-  ---------------------------------------- */
-
-  const slots =
-    selectedDate && duration
-      ? generateSlots({
-          availability: dayAvailability,
-          bookings,
-          duration,
-          selectedDate,
-        })
-      : []
 
   /* ----------------------------------------
      UI
@@ -214,7 +236,13 @@ export default function ExpertBookingPage() {
               onSelect={setSelectedTime}
             />
 
-            <p className="mt-3 text-xs text-gray-400">
+            {loadingSlots && (
+              <p className="mt-3 text-xs text-gray-400">
+                Loading available times…
+              </p>
+            )}
+
+            <p className="mt-2 text-xs text-gray-400">
               All times shown are in IST
             </p>
           </section>
@@ -227,6 +255,8 @@ export default function ExpertBookingPage() {
             date={selectedDate}
             time={selectedTime}
             duration={duration}
+            /* 🔒 NEW */
+            isSelfBooking={isSelfBooking}
           />
         </div>
       </div>

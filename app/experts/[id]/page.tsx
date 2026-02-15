@@ -6,14 +6,36 @@ import { useEffect, useState } from 'react'
 import { useParams } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 
-/* ---------- Components (FROZEN) ---------- */
 import HostProfileBanner from './components/HostProfileBanner'
 import HostAbout from './components/HostAbout'
 import HostTopics from './components/HostTopics'
 import HostQuickFacts from './components/HostQuickFacts'
-import HostReviews from './components/HostReviews'
+import HostReviews, { Review } from './components/HostReviews'
 
-/* ---------- Types ---------- */
+/* 🔹 SAME ICON MAP AS EXPLORE (UPDATED, NOT TRUNCATED) */
+const CATEGORY_ICON: Record<string, string> = {
+  cooking: '🍳',
+  fitness: '🏋️',
+  sports: '🏅',
+  travel: '✈️',
+
+  finance: '💰',
+  investments: '📈',
+
+  startups: '🚀',
+  startup: '🚀',
+  business: '💼',
+  career: '🚀',
+
+  technology: '💻',
+  leadership: '🧭',
+  education: '🎓',
+  'industry-experts': '🏭',
+
+  'mental-health': '🧠',
+  health: '❤️',
+  design: '🎨',
+}
 
 type Expert = {
   user_id: string
@@ -23,24 +45,36 @@ type Expert = {
   city?: string
   country?: string
   company?: string
-  profile_image_url?: string
 
+  profile_image_url?: string
   designation?: string
+  department?: string
   experience_years?: number
 
-  categories?: string[]
-  topics?: string[]
+  category_slugs?: string[]
+  category_names?: string[]
 
+  topics?: string[]
   rating?: number
   conversations_count?: number
-}
 
-/* ---------- Page ---------- */
+  linkedin_url?: string | null
+  twitter_url?: string | null
+}
 
 export default function ExpertProfilePage() {
   const { id } = useParams()
+
   const [expert, setExpert] = useState<Expert | null>(null)
+  const [reviews, setReviews] = useState<Review[]>([])
   const [loading, setLoading] = useState(true)
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null)
+
+  useEffect(() => {
+    supabase.auth.getUser().then(({ data }) => {
+      setCurrentUserId(data.user?.id ?? null)
+    })
+  }, [])
 
   useEffect(() => {
     if (id) fetchExpert()
@@ -49,28 +83,30 @@ export default function ExpertProfilePage() {
   async function fetchExpert() {
     setLoading(true)
 
-    const { data: publicRow, error } = await supabase
+    const { data: publicRow } = await supabase
       .from('public_expert_search')
       .select('*')
       .eq('user_id', id)
       .single()
 
-    if (error || !publicRow) {
+    if (!publicRow) {
       setExpert(null)
       setLoading(false)
       return
     }
 
+    /* ✅ FETCH PROFILE DETAILS */
     const { data: profile } = await supabase
       .from('expert_profiles')
-      .select(
-        `
+      .select(`
         profile_image_url,
         designation,
+        department,
         experience_years,
-        sub_category_tags
-      `
-      )
+        sub_category_tags,
+        linkedin_url,
+        twitter_url
+      `)
       .eq('user_id', id)
       .single()
 
@@ -84,79 +120,104 @@ export default function ExpertProfilePage() {
       company: publicRow.company,
 
       profile_image_url: profile?.profile_image_url,
-      designation: profile?.designation || 'Advisor',
+      designation: profile?.designation || undefined, // ✅ NO fake "Advisor"
+      department: profile?.department,
       experience_years: profile?.experience_years,
 
-      categories: publicRow.categories || [],
-      topics: profile?.sub_category_tags || [],
+      category_slugs: publicRow.category_slugs || [],
+      category_names: publicRow.category_names || [],
 
-      rating: publicRow.average_rating ?? 4.9,
+      topics: profile?.sub_category_tags || [],
+      rating: publicRow.average_rating ?? 0,
       conversations_count: publicRow.total_reviews ?? 0,
+
+      linkedin_url: profile?.linkedin_url ?? null,
+      twitter_url: profile?.twitter_url ?? null,
     })
+
+    const { data: reviewsData } = await supabase
+      .from('reviews')
+      .select(`
+        rating,
+        comment,
+        created_at,
+        users ( full_name )
+      `)
+      .eq('expert_id', id)
+      .order('created_at', { ascending: false })
+
+    setReviews(
+      (reviewsData || []).map(r => ({
+        reviewer_name: r.users?.full_name || 'Anonymous',
+        rating: r.rating,
+        comment: r.comment || '',
+      }))
+    )
 
     setLoading(false)
   }
 
-  /* ---------- Loading / Error ---------- */
+  if (loading || !expert) return null
 
-  if (loading) {
-    return (
-      <main className="relative min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
-        <div className="mx-auto max-w-6xl px-6 py-24 text-slate-500">
-          Loading profile…
-        </div>
-      </main>
-    )
-  }
-
-  if (!expert) {
-    return (
-      <main className="relative min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
-        <div className="mx-auto max-w-6xl px-6 py-24 text-slate-500">
-          Profile not found.
-        </div>
-      </main>
-    )
-  }
-
-  /* ---------- Main ---------- */
+  const isSelfProfile = currentUserId === expert.user_id
 
   return (
     <main className="relative min-h-screen bg-gradient-to-b from-sky-50 via-white to-white">
-      {/* Soft Intella atmospheric glow (lighter than Home) */}
-      <div className="pointer-events-none absolute -top-48 left-1/2 h-[520px] w-[520px] -translate-x-1/2 rounded-full bg-sky-200/25 blur-[180px]" />
-
-      {/* Content rail */}
       <div className="relative z-10 mx-auto max-w-6xl px-6">
-        {/* Banner */}
-        <HostProfileBanner expert={expert} />
 
-        {/* Unified content surface */}
+        <HostProfileBanner
+          expert={expert}
+          isSelfProfile={isSelfProfile}
+        />
+
         <div className="mt-6 rounded-3xl bg-white/70 backdrop-blur border border-slate-200/60 px-6 md:px-8 pb-16">
-
-          {/* 2-column layout */}
           <div className="grid grid-cols-1 md:grid-cols-[1fr_280px] gap-10 pt-8">
-
-            {/* LEFT: narrative */}
             <div className="space-y-6">
               <HostAbout bio={expert.bio || ''} />
 
-              {/* subtle divider */}
+              {expert.category_names && expert.category_names.length > 0 && (
+                <>
+                  <div className="h-px bg-slate-200/50" />
+
+                  <section>
+                    <h3 className="text-[15px] font-semibold text-slate-900">
+                      Categories
+                    </h3>
+
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {expert.category_names.map((name, idx) => {
+                        const slug = expert.category_slugs?.[idx]
+                        return (
+                          <span
+                            key={name}
+                            className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-[13px] text-slate-700"
+                          >
+                            <span>
+                              {CATEGORY_ICON[slug ?? ''] ?? '💡'}
+                            </span>
+                            {name}
+                          </span>
+                        )
+                      })}
+                    </div>
+                  </section>
+                </>
+              )}
+
               <div className="h-px bg-slate-200/50" />
 
               <HostTopics topics={expert.topics} />
 
-              {/* subtle divider */}
               <div className="h-px bg-slate-200/50" />
 
-              <HostReviews />
+              <HostReviews reviews={reviews} />
             </div>
 
-            {/* RIGHT: quick facts (supporting) */}
             <aside className="md:pt-2">
               <HostQuickFacts
-                designation={expert.designation}
+                department={expert.department}
                 company={expert.company}
+                designation={expert.designation}
                 experience_years={expert.experience_years}
                 conversations_count={expert.conversations_count}
                 city={expert.city}

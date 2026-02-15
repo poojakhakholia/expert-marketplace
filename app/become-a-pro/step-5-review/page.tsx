@@ -133,7 +133,10 @@ export default function Step5Review() {
           designation,
           department,
           mobile_number,
-          profile_image_url,
+          profile_image_url:
+            profile_image_url ??
+            user.user_metadata?.avatar_url ??
+            null,
 
           sub_category_tags: topics ?? [],
           skills: skills ?? [],

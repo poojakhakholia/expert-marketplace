@@ -19,11 +19,32 @@ export default function Login() {
 
       const user = data.session.user;
 
+      // ✅ Upsert user as before
       await supabase.from("users").upsert({
         id: user.id,
         email: user.email,
         full_name: user.user_metadata?.name ?? null,
       });
+
+      // ✅ NEW: Check activation state
+      const { data: existingUser } = await supabase
+        .from("users")
+        .select("is_active")
+        .eq("id", user.id)
+        .single();
+
+      // If user was deactivated → auto reactivate
+      if (existingUser && existingUser.is_active === false) {
+        await supabase
+          .from("users")
+          .update({
+            is_active: true,
+            deactivated_at: null,
+          })
+          .eq("id", user.id);
+      }
+
+      // Existing redirect logic continues unchanged
 
       if (explicitRedirect) {
         router.replace(explicitRedirect);
@@ -105,7 +126,6 @@ export default function Login() {
           Continue with Google
         </button>
 
-        {/* Microcopy for signup clarity */}
         <p className="mt-3 text-xs text-slate-500">
           New to Intella? Your account will be created automatically.
         </p>

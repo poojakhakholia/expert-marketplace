@@ -64,7 +64,7 @@ export default function Step3Pricing() {
         const { data, error } = await supabase
           .from('expert_profiles')
           .select(
-            'fee_15, fee_30, fee_45, fee_60'
+            'fee_15, fee_30, fee_45, fee_60, conversation_note_15, conversation_note_30, conversation_note_45, conversation_note_60'
           )
           .eq('user_id', userId)
           .single()
@@ -80,6 +80,11 @@ export default function Step3Pricing() {
           fee_30: data.fee_30,
           fee_45: data.fee_45,
           fee_60: data.fee_60,
+
+          conversation_note_15: data.conversation_note_15 ?? '',
+          conversation_note_30: data.conversation_note_30 ?? '',
+          conversation_note_45: data.conversation_note_45 ?? '',
+          conversation_note_60: data.conversation_note_60 ?? '',
         }
 
         setDraft(initialDraft)
@@ -177,6 +182,11 @@ export default function Step3Pricing() {
             fee_30: draft.fee_30 ?? null,
             fee_45: draft.fee_45 ?? null,
             fee_60: draft.fee_60 ?? null,
+
+            conversation_note_15: draft.conversation_note_15 ?? null,
+            conversation_note_30: draft.conversation_note_30 ?? null,
+            conversation_note_45: draft.conversation_note_45 ?? null,
+            conversation_note_60: draft.conversation_note_60 ?? null,
           })
           .eq('user_id', user.id)
 
