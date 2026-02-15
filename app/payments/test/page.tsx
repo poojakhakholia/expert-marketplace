@@ -1,6 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
+export const dynamic = 'force-dynamic'
+
+import { Suspense, useEffect, useState } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import Script from "next/script";
 import { supabase } from "@/lib/supabase";
@@ -17,7 +19,17 @@ function generateOrderCode() {
   return `A-${num}`;
 }
 
+/* 🔹 WRAPPER (required for useSearchParams) */
 export default function TestPaymentPage() {
+  return (
+    <Suspense fallback={<div className="intella-page p-10">Loading payment…</div>}>
+      <TestPaymentContent />
+    </Suspense>
+    );
+  }
+
+  /* 🔹 ACTUAL PAGE */
+function TestPaymentContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
 

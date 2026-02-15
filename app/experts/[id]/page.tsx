@@ -148,7 +148,10 @@ export default function ExpertProfilePage() {
 
     setReviews(
       (reviewsData || []).map(r => ({
-        reviewer_name: r.users?.full_name || 'Anonymous',
+        reviewer_name:
+        Array.isArray(r.users) && r.users.length > 0
+        ? r.users[0].full_name
+        : 'Anonymous',
         rating: r.rating,
         comment: r.comment || '',
       }))

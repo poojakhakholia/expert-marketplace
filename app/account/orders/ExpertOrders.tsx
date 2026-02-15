@@ -16,7 +16,7 @@ type Booking = {
   user_message: string | null;
   users: {
     full_name: string | null;
-  } | null;
+  }[] | null;
 };
 
 function formatDateTime(value?: string) {
@@ -191,7 +191,7 @@ export default function ExpertOrders() {
                       {formatDateTime(b.created_at)}
                     </td>
                     <td className="px-4 py-3 font-medium">
-                      {b.users?.full_name ?? "Customer"}
+                      {b.users?.[0]?.full_name ?? "Customer"}
                     </td>
                     <td className="px-4 py-3">
                       {formatDateTime(

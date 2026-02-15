@@ -90,7 +90,10 @@ export default function EarningsDetailsPage() {
             host_joined_at: b.host_joined_at,
             session_end_at: b.session_end_at,
             is_disputed: b.is_disputed,
-            buyer_name: b.users?.full_name ?? null,
+            buyer_name:
+            Array.isArray(b.users) && b.users.length > 0
+            ? b.users[0].full_name
+            : null,
           },
         ])
       );

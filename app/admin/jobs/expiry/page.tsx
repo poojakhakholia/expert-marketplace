@@ -11,7 +11,7 @@ type ExpirableBooking = {
   start_time: string;
   expert_profiles: {
     full_name: string | null;
-  } | null;
+  }[] | null;
 };
 
 export default function AdminExpiredBookingsJobPage() {
@@ -172,7 +172,7 @@ export default function AdminExpiredBookingsJobPage() {
               <tr key={r.id} className="border-t">
                 <td className="px-3 py-2">{r.order_code ?? "—"}</td>
                 <td className="px-3 py-2">
-                  {r.expert_profiles?.full_name ?? "—"}
+                  {r.expert_profiles?.[0]?.full_name ?? "—"}
                 </td>
                 <td className="px-3 py-2 text-right">
                   ₹{r.amount.toLocaleString("en-IN")}

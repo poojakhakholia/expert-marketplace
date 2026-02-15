@@ -183,8 +183,8 @@ export default function ExplorePage() {
 
     if (typeof e.fee_15 === 'number') feeMap.push({ price: e.fee_15, duration: 15 })
     if (typeof e.fee_30 === 'number') feeMap.push({ price: e.fee_30, duration: 30 })
-    if (typeof e.fee_30 === 'number') feeMap.push({ price: e.fee_45, duration: 45 })
-    if (typeof e.fee_30 === 'number') feeMap.push({ price: e.fee_60, duration: 60 })
+    if (typeof e.fee_45 === 'number') feeMap.push({ price: e.fee_45, duration: 45 })
+    if (typeof e.fee_60 === 'number') feeMap.push({ price: e.fee_60, duration: 60 })
 
     if (feeMap.length === 0) return null
 

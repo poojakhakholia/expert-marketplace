@@ -24,8 +24,11 @@ interface Booking {
   meeting_link: string | null;
   host_accepted: boolean;
   payment_status: string;
-  users?: { full_name: string | null };
-  expert_profiles?: { full_name: string | null };
+  no_show_by?: string | null;
+  host_joined_at?: string | null;
+  user_joined_at?: string | null;
+  users?: { full_name: string | null }[] | null;
+  expert_profiles?: { full_name: string | null }[] | null;
 }
 
 interface Review {
@@ -239,8 +242,8 @@ export default function MySessionsPage() {
         {list.map((b) => {
           const isRequestor = currentUserId === b.user_id;
           const displayName = isRequestor
-            ? b.expert_profiles?.full_name
-            : b.users?.full_name;
+            ? b.expert_profiles?.[0]?.full_name
+            : b.users?.[0]?.full_name;
 
           const join =
             tab === "upcoming" ? getJoinState(b) : { show: false };
@@ -297,8 +300,8 @@ export default function MySessionsPage() {
                       .from("bookings")
                       .update(
                         isRequestor
-                          ? { user_joined_at: new Date().toISOString("sv-SE", { timeZone: "Asia/Kolkata" }) }
-                          : { host_joined_at: new Date().toISOString("sv-SE", { timeZone: "Asia/Kolkata" }) }
+                          ? { user_joined_at: new Date().toISOString() }
+                          : { host_joined_at: new Date().toISOString() }
                       )
                       .eq("id", b.id);
 

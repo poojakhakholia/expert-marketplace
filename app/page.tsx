@@ -1,7 +1,7 @@
 import HeroSection from './components/HeroSection'
 import CategoryExpertsSection from './components/CategoryExpertsSection'
 import HowItWorksSection from './components/HowItWorksSection'
-import FAQSection from './components/FAQSection'
+
 
 
 export default function Home() {
@@ -16,7 +16,7 @@ export default function Home() {
       <HowItWorksSection />
 
       {/* FAQ */}
-      
+     
     </main>
   )
 }
