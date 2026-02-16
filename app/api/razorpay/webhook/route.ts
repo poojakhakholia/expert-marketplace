@@ -1,11 +1,43 @@
 import { NextRequest, NextResponse } from "next/server";
 import { supabaseServer } from "@/lib/supabase-server";
 import { sendSessionRequestEmail } from "@/lib/email/sendSessionRequest";
+import crypto from "crypto";
+
+export const runtime = "nodejs";
+
+/* 🔐 VERIFY RAZORPAY SIGNATURE */
+function verifySignature(body: string, signature: string | null) {
+  if (!signature) return false;
+
+  const secret = process.env.RAZORPAY_WEBHOOK_SECRET;
+  if (!secret) {
+    throw new Error("RAZORPAY_WEBHOOK_SECRET not set");
+  }
+
+  const expected = crypto
+  .createHmac("sha256", secret)
+  .update(body)
+  .digest("hex");
+
+  return expected === signature;
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const payload = await req.json();
+    const rawBody = await req.text();
+    const signature = req.headers.get("x-razorpay-signature");
 
+    /* 🔒 Reject if signature invalid */
+    if (!verifySignature(rawBody, signature)) {
+      console.error("❌ Invalid Razorpay signature");
+      return NextResponse.json(
+        { error: "invalid_signature" },
+        { status: 400 }
+        );
+      }
+
+    const payload = JSON.parse(rawBody);
+    
     const event = payload.event;
     const payment = payload.payload?.payment?.entity;
 
