@@ -16,8 +16,8 @@ type Booking = {
   user_message: string | null;
   expert_profiles: {
     full_name: string | null;
-  }[] | null;
-};
+    } | null;
+  };
 
 function formatDateTime(value?: string) {
   if (!value) return "—";
@@ -118,13 +118,17 @@ export default function UserOrders() {
         status,
         payment_status,
         user_message,
-        expert_profiles (
-          full_name
+        expert_profiles!bookings_expert_id_fkey (
+        full_name
         )
       `)
       .eq("user_id", session.user.id)
-      .order("created_at", { ascending: false });
+      .order("created_at", { ascending: false }) as {
+        data: Booking[] | null;
+        error: any;
+      };
 
+            
     if (error || !data) {
       console.error(error);
       setLoading(false);
@@ -225,7 +229,7 @@ export default function UserOrders() {
                       {formatDateTime(b.created_at)}
                     </td>
                     <td className="px-4 py-3 font-medium">
-                      {b.expert_profiles?.[0]?.full_name ?? "Host"}
+                      {b.expert_profiles?.full_name ?? "Host"}
                     </td>
                     <td className="px-4 py-3">
                       {formatDateTime(conversationDateTime)}

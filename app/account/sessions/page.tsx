@@ -27,8 +27,8 @@ interface Booking {
   no_show_by?: string | null;
   host_joined_at?: string | null;
   user_joined_at?: string | null;
-  users?: { full_name: string | null }[] | null;
-  expert_profiles?: { full_name: string | null }[] | null;
+  users?: { full_name: string | null } | null;
+  expert_profiles?: { full_name: string | null } | null;
 }
 
 interface Review {
@@ -123,8 +123,8 @@ export default function MySessionsPage() {
         .select(
           `
           *,
-          users(full_name),
-          expert_profiles(full_name)
+          users!bookings_user_id_fkey ( full_name ),
+          expert_profiles!bookings_expert_id_fkey ( full_name ) 
         `
         )
         .or(
@@ -242,8 +242,8 @@ export default function MySessionsPage() {
         {list.map((b) => {
           const isRequestor = currentUserId === b.user_id;
           const displayName = isRequestor
-            ? b.expert_profiles?.[0]?.full_name
-            : b.users?.[0]?.full_name;
+            ? b.expert_profiles?.full_name
+            : b.users?.full_name;
 
           const join =
             tab === "upcoming" ? getJoinState(b) : { show: false };
