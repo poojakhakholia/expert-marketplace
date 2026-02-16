@@ -122,17 +122,12 @@ export default function EarningsDetailsPage() {
 
   const totals = rows.reduce(
     (acc, r) => {
-      const isNoShow =
-        r.status === "confirmed" &&
-        !r.host_joined_at &&
-        !!r.session_end_at;
-
       acc.gross += r.gross_earning;
       acc.cancellation += r.cancellation_amount;
       acc.rejection += r.rejection_amount;
-      acc.noShow += isNoShow ? r.gross_earning : 0;
-      acc.intellaFee += isNoShow ? 0 : r.intella_fee;
-      acc.pgFee += isNoShow ? 0 : r.pg_fee;
+      acc.noShow += r.no_show_amount;
+      acc.intellaFee += r.intella_fee;
+      acc.pgFee += r.pg_fee;
 
       return acc;
     },
@@ -202,17 +197,13 @@ export default function EarningsDetailsPage() {
 
           <tbody>
             {rows.map((r, i) => {
-              const isNoShow =
-                r.status === "confirmed" &&
-                !r.host_joined_at &&
-                !!r.session_end_at;
-
+              
               const rowExpenses =
                 r.cancellation_amount +
                 r.rejection_amount +
-                (isNoShow ? r.gross_earning : 0) +
-                (isNoShow ? 0 : r.intella_fee) +
-                (isNoShow ? 0 : r.pg_fee);
+                r.no_show_amount +
+                r.intella_fee +
+                r.pg_fee;
 
               return (
                 <tr key={i} className="border-t">
@@ -228,13 +219,13 @@ export default function EarningsDetailsPage() {
                     {formatINR(r.rejection_amount)}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {formatINR(isNoShow ? r.gross_earning : 0)}
+                    {formatINR(r.no_show_amount)}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {formatINR(isNoShow ? 0 : r.intella_fee)}
+                    {formatINR(r.intella_fee)}
                   </td>
                   <td className="px-3 py-2 text-right">
-                    {formatINR(isNoShow ? 0 : r.pg_fee)}
+                    {formatINR(r.pg_fee)}
                   </td>
                   <td className="px-3 py-2 text-right font-medium">
                     {formatINR(rowExpenses)}
