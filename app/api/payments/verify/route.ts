@@ -42,7 +42,7 @@ export async function POST(req: Request) {
       );
     }
 
-    /* 2️⃣ SIGNATURE VERIFICATION (UNCHANGED) */
+    /* 2️⃣ SIGNATURE VERIFICATION */
     const signPayload = `${razorpay_order_id}|${razorpay_payment_id}`;
 
     const generatedSignature = crypto
@@ -57,18 +57,44 @@ export async function POST(req: Request) {
       );
     }
 
-    /* 3️⃣ PAYMENT VERIFIED — UPDATE BOOKING STATE ONLY */
-    const { error } = await supabase
+    /* 3️⃣ FETCH BOOKING */
+    const { data: booking, error: bookingError } = await supabase
+      .from("bookings")
+      .select("id, user_id")
+      .eq("id", booking_id)
+      .single();
+
+    if (bookingError || !booking) {
+      console.error("BOOKING NOT FOUND:", bookingError);
+      return NextResponse.json(
+        { error: "Booking not found" },
+        { status: 400 }
+      );
+    }
+
+    /* 4️⃣ FETCH BUYER NAME */
+    const { data: userRow } = await supabase
+      .from("users")
+      .select("full_name")
+      .eq("id", booking.user_id)
+      .single();
+
+    const buyerName = userRow?.full_name ?? "Customer";
+
+    /* 5️⃣ UPDATE BOOKING (CLEAN STATE) */
+    const { error: updateError } = await supabase
       .from("bookings")
       .update({
         payment_status: "confirmed",
         payment_id: razorpay_payment_id,
+        buyer_name: buyerName,
+        cancelled_by: null, // ✅ Clear inconsistent state
       })
       .eq("id", booking_id);
 
-    if (error) {
-      console.error("SUPABASE UPDATE FAILED:", error);
-      // ⚠️ Important: payment is still valid, do not fail
+    if (updateError) {
+      console.error("SUPABASE UPDATE FAILED:", updateError);
+      // ⚠️ Payment is valid, do not fail verification
     }
 
     console.log("✅ PAYMENT VERIFIED:", booking_id);
