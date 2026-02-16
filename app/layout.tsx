@@ -10,6 +10,9 @@ const Header = dynamic(
 export const metadata = {
   title: 'Intella',
   description: 'Book 1-on-1 calls to learn from peoples real world experience',
+  verification: {
+    google: 'nz6AMDOdNx7s6bdCrPcYmYrNbaNCdcQNAmK3x18nsPk',
+  },
 }
 
 export default function RootLayout({
