@@ -98,6 +98,15 @@ function LoginContent() {
     });
   };
 
+  const loginWithLinkedIn = async () => {
+    await supabase.auth.signInWithOAuth({
+      provider: "linkedin_oidc", // IMPORTANT
+      options: {
+        redirectTo: process.env.NEXT_PUBLIC_SITE_URL + "/login",
+      },
+    });
+  };
+
   return (
     <main className="min-h-[calc(100vh-120px)] flex items-center justify-center px-6">
       <div className="w-full max-w-md text-center intella-card py-10 px-8">
@@ -132,6 +141,13 @@ function LoginContent() {
             />
           </svg>
           Continue with Google
+        </button>
+
+        <button
+        onClick={loginWithLinkedIn}
+        className="mt-4 w-full bg-[#0A66C2] hover:bg-[#004182] text-white rounded-full py-3 text-sm font-medium transition"
+        >
+          Continue with LinkedIn
         </button>
 
         <p className="mt-3 text-xs text-slate-500">
